@@ -245,8 +245,7 @@ class ValetudoXiaomiVacuum {
                     log.error(`Failed to execute go home: ${e}`);
                 })
                 .finally(() => {
-                    callback();
-                    this.updateStatus(true);
+                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
                 });
         }
     }
@@ -278,8 +277,7 @@ class ValetudoXiaomiVacuum {
                     log.error(`Failed to execute start cleaning: ${e}`);
                 })
                 .finally(() => {
-                    callback();
-                    this.updateStatus(true);
+                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
                 });
         } else {
             this.getStatus(true, (err) => {
@@ -288,7 +286,9 @@ class ValetudoXiaomiVacuum {
                 }
 
                 if (this.current_status.state === ValetudoXiaomiVacuum.STATES.CLEANING) {
-                    this.stopCleaning(() => {});
+                    this.stopCleaning(() => {
+                        callback();
+                    });
                 }
             });
         }
@@ -320,8 +320,7 @@ class ValetudoXiaomiVacuum {
                 this.log.error(`Failed to execute spot clean: ${e}`);
                 })
                 .finally(() => {
-                    callback();
-                    this.updateStatus(true);
+                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
             });
         });
     }
