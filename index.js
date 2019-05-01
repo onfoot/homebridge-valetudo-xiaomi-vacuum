@@ -255,7 +255,7 @@ class ValetudoXiaomiVacuum {
 
         this.getStatus(false, (error) => {
 
-            this.log.debug(`Is going home? error: ${error}, state: ${this.current_status.state}`);
+            this.log.debug(`Is going home? error: ${error}, state: ${this.current_status !== null ? this.current_status.state : null}`);
 
             if (error) {
                 return callback(new Error(`Error retrieving going home status: ${error}`));
@@ -328,7 +328,7 @@ class ValetudoXiaomiVacuum {
     isCleaning (callback) {
         this.getStatus(false, (error) => {
 
-            this.log.debug(`Is cleaning? error: ${error}, state: ${this.current_status.state}`);
+            this.log.debug(`Is cleaning? error: ${error}, state: ${this.current_status !== null ? this.current_status.state : null}`);
 
             if (error) {
                 return callback(error);
@@ -361,7 +361,7 @@ class ValetudoXiaomiVacuum {
     isSpotCleaning (callback) {
         this.getStatus(false, (error) => {
 
-            this.log.debug(`Is spot cleaning? error: ${error}, state: ${this.current_status.state}`);
+            this.log.debug(`Is spot cleaning? error: ${error}, state: ${this.current_status !== null ? this.current_status.state : null}`);
 
             if (error) {
                 return callback(error);
