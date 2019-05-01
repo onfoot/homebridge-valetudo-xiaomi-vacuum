@@ -42,7 +42,7 @@ class ValetudoXiaomiVacuum {
 
         this.findService = new Service.Switch('Find ' + this.name, 'identify');
         this.findService.getCharacteristic(Characteristic.On)
-            .on('set', this.identify.bind(this));
+            .on('set', this.doFind.bind(this));
         this.services.push(this.findService);
 
         this.goHomeService = new Service.Switch('Go home, ' + this.name, 'home');
@@ -214,24 +214,31 @@ class ValetudoXiaomiVacuum {
             });
     }
 
-    identify (state, callback) {
+    doFind(state, callback) {
         var log = this.log;
 
         if (state) {
             log.debug('Executing vacuum find');
-
-            this.sendJSONRequest('http://' + this.ip + '/api/find_robot', 'PUT')
-                .then((response) => {})
-                .catch((e) => {
-                    log.error(`Failed to identify robot: ${e}`);
-                })
-                .finally(() => {
-                    callback();
-                    setTimeout(() => {
-                        this.findService.updateCharacteristic(Characteristic.On, false);
-                    }, 250);
-                });
+            this.identify(() => {
+                callback(null);
+                setTimeout(() => {
+                    this.findService.updateCharacteristic(Characteristic.On, false);
+                }, 250);
+            });
+        } else {
+            callback(null);
         }
+    }
+
+    identify (callback) {
+        this.sendJSONRequest('http://' + this.ip + '/api/find_robot', 'PUT')
+            .then((response) => { })
+            .catch((e) => {
+                log.error(`Failed to identify robot: ${e}`);
+            })
+            .finally(() => {
+                callback();
+            });
     }
 
     goHome (state, callback) {
