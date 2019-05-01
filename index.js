@@ -1,6 +1,7 @@
 'use strict';
 
 const http = require('http');
+const URL = require('url');
 
 var Accessory, Service, Characteristic, UUIDGen;
 
@@ -373,15 +374,23 @@ class ValetudoXiaomiVacuum {
 
     sendJSONRequest (url, method = 'GET') {
         return new Promise((resolve, reject) => {
+
+            const components = URL.parse(url);
+
             const options = {
-                method: method
+                method: method,
+                host: components.host,
+                port: components.port,
+                path: components.pathname,
+                protocol: components.protocol
             };
     
-            const req = http.request(url, options, (res) => {
+            const req = http.request(options, (res) => {
                 let chunks = '';
                 res.on('data', (chunk) => { chunks += chunk; });
                 res.on('end', () => {
                     try {
+                        this.log.debug(`Response: ${chunks}`);
                         const parsed = JSON.parse(chunks);
                         resolve(parsed);
                     } catch(e) {
