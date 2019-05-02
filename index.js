@@ -1,7 +1,7 @@
 'use strict';
 
 const http = require('http');
-const URL = require('url');
+const urllib = require('url');
 
 var Accessory, Service, Characteristic, UUIDGen;
 
@@ -480,7 +480,7 @@ class ValetudoXiaomiVacuum {
     sendJSONRequest (url, method = 'GET', payload = null) {
         return new Promise((resolve, reject) => {
 
-            const components = URL.parse(url);
+            const components = new urllib.URL(url);
 
             const options = {
                 method: method,
