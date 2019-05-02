@@ -45,17 +45,33 @@ class ValetudoXiaomiVacuum {
             .on('set', this.doFind.bind(this));
         this.services.push(this.findService);
 
-        this.goHomeService = new Service.Switch('Go home, ' + this.name, 'home');
+        this.goHomeService = new Service.Switch('Go Home, ' + this.name, 'home');
         this.goHomeService.getCharacteristic(Characteristic.On)
             .on('set', this.goHome.bind(this))
             .on('get', this.isGoingHome.bind(this));
         this.services.push(this.goHomeService);
 
-        this.cleanService = new Service.Switch(this.name + ' Start cleaning', 'clean');
+        this.cleanService = new Service.Switch('Clean, ' + this.name, 'clean');
         this.cleanService.getCharacteristic(Characteristic.On)
             .on('set', this.startCleaning.bind(this))
             .on('get', this.isCleaning.bind(this));
         this.services.push(this.cleanService);
+
+        this.spotCleanService = new Service.Switch('Spot Clean, ' + this.name, 'spotclean');
+        this.spotCleanService.getCharacteristic(Characteristic.On)
+            .on('set', this.startSpotCleaning.bind(this))
+            .on('get', this.isSpotCleaning.bind(this));
+        this.services.push(this.spotCleanService);
+
+        this.speakerService = new Service.Speaker(this.name, 'speaker');
+        this.speakerService.getCharacteristic(Characteristic.Volume)
+            .on('set', this.setVolume.bind(this))
+            .on('get', this.getVolume.bind(this));
+        this.speakerService.getCharacteristic(Characteristic.Mute)
+            .on('set', this.setMute.bind(this))
+            .on('get', this.getMute.bind(this));
+
+        this.services.push(this.speakerService);
 
         this.batteryService = new Service.BatteryService(this.name + ' Battery');
         this.batteryService
@@ -89,73 +105,6 @@ class ValetudoXiaomiVacuum {
     setupUpdateTimer() {
         clearTimeout(this.status_timer);
         this.status_timer = setTimeout(() => { this.updateStatus(true); }, this.updateInterval());
-    }
-
-    updateStatus(forced = false) {
-        this.log.debug('Updating vacuum status');
-        this.getStatus(forced, (err) => {
-            if (err) {
-                return;
-            }
-
-            this.log.debug('Updating characteristics');
-
-            this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, this.current_status.battery);
-            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery < 20
-                ? Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW : Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL);
-            this.batteryService.updateCharacteristic(Characteristic.ChargingState, this.current_status.state == ValetudoXiaomiVacuum.STATES.CHARGING
-                ? Characteristic.ChargingState.CHARGING : Characteristic.ChargingState.NOT_CHARGING);
-
-            this.cleanService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES.CLEANING); // cleaning
-            this.goHomeService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES.RETURNING_HOME); // driving home
-
-            this.setupUpdateTimer();
-        });
-    }
-
-
-    getStatus(forced, callback) {
-        if (this.status_callbacks.length > 0) {
-            this.log.debug('Pushing status callback to queue - updating');
-            this.status_callbacks.push(callback);
-            return;
-        }
-
-        const now = Date.now();
-
-        if (!forced && this.current_status !== null && 
-            this.current_status_time !== null && 
-            (now - this.current_status_time < this.updateInterval())) {
-                this.log.debug('Returning cached status');
-                callback(null);
-                return;
-        }
-
-        this.log.debug(`Executing update, forced: ${forced}`);
-        this.status_callbacks.push(callback);
-
-        this.sendJSONRequest('http://' + this.ip + '/api/current_status')
-            .then((response) => {
-                this.log.debug('Done executing update');
-                this.current_status = response;
-                this.current_status_time = Date.now();
-                const callbacks = this.status_callbacks;
-                this.status_callbacks = new Array();
-
-                this.log.debug(`Calling ${callbacks.length} queued callbacks`);
-                callbacks.forEach((element) => {
-                    element(null, response);
-                });
-            })
-            .catch((e) => {
-                this.log.error(`Error parsing current status info: ${e}`);
-                const callbacks = this.status_callbacks;
-                this.status_callbacks = new Array();
-
-                callbacks.forEach((element) => {
-                    element(e);
-                });
-            });
     }
 
     getBattery(callback) {
@@ -273,6 +222,89 @@ class ValetudoXiaomiVacuum {
         });
     }
 
+    checkVolume (callback) {
+        this.sendJSONRequest('http://' + this.ip + '/api/test_sound_volume', 'PUT')
+            .then((response) => {})
+            .catch((e) => {
+                log.error(`Failed to test volume: ${e}`);
+            })
+            .finally(() => {
+                callback();
+            });
+    }
+
+    setVolume (value, callback) {
+        var log = this.log;
+
+        const volume = Math.max(1, value);
+
+        log.debug(`Setting volume to ${volume}`);
+        this.sendJSONRequest('http://' + this.ip + '/api/set_sound_volume', 'PUT', {volume: volume})
+            .then((response) => {
+                this.checkVolume ( () => {
+                    callback();
+                });
+            })
+            .catch((e) => {
+                log.error(`Failed to change volume: ${e}`);
+                callback();
+            });
+    }
+
+    updateVolume (callback) {
+        this.getVolume((err, volume) => {
+            if (err) {
+                callback(err);
+                return;
+            }
+
+            this.speakerService.updateCharacteristic(Characteristic.Volume, volume);
+            callback();
+        });
+    }
+
+    getVolume (callback) {
+        var log = this.log;
+
+        this.sendJSONRequest('http://' + this.ip + '/api/get_sound_volume', 'GET')
+            .then((response) => {
+                log.debug(`Got volume: ${response}`);
+                callback(null, response);
+            })
+            .catch((e) => {
+                log.error(`Failed to get volume: ${e}`);
+                callback(e);
+            });
+    }
+
+    setMute (mute, callback) {
+        var log = this.log;
+
+        log.debug(`Setting mute to ${mute}`);
+
+        const value = mute ? 1 : 100;
+
+        this.setVolume(value, () => {
+            this.updateVolume( () => {
+                callback();
+            });
+        });
+    }
+
+    getMute (callback) {
+        var log = this.log;
+
+        this.sendJSONRequest('http://' + this.ip + '/api/get_sound_volume', 'GET')
+            .then((response) => {
+                log.debug(`Got volume for Mute: ${response.volume}`);
+                callback(null, response.volume < 10 ? true : false);
+            })
+            .catch((e) => {
+                log.error(`Failed to get volume for Mute: ${e}`);
+                callback(e);
+            });
+    }
+
     startCleaning (state, callback) {
         var log = this.log;
 
@@ -379,7 +411,73 @@ class ValetudoXiaomiVacuum {
         });
     }
 
-    sendJSONRequest (url, method = 'GET') {
+    updateStatus(forced = false) {
+        this.log.debug('Updating vacuum status');
+        this.getStatus(forced, (err) => {
+            if (err) {
+                return;
+            }
+
+            this.log.debug('Updating characteristics');
+
+            this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, this.current_status.battery);
+            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery < 20
+                ? Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW : Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL);
+            this.batteryService.updateCharacteristic(Characteristic.ChargingState, this.current_status.state == ValetudoXiaomiVacuum.STATES.CHARGING
+                ? Characteristic.ChargingState.CHARGING : Characteristic.ChargingState.NOT_CHARGING);
+
+            this.cleanService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES.CLEANING); // cleaning
+            this.goHomeService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES.RETURNING_HOME); // driving home
+
+            this.setupUpdateTimer();
+        });
+    }
+
+    getStatus(forced, callback) {
+        if (this.status_callbacks.length > 0) {
+            this.log.debug('Pushing status callback to queue - updating');
+            this.status_callbacks.push(callback);
+            return;
+        }
+
+        const now = Date.now();
+
+        if (!forced && this.current_status !== null && 
+            this.current_status_time !== null && 
+            (now - this.current_status_time < this.updateInterval())) {
+                this.log.debug('Returning cached status');
+                callback(null);
+                return;
+        }
+
+        this.log.debug(`Executing update, forced: ${forced}`);
+        this.status_callbacks.push(callback);
+
+        this.sendJSONRequest('http://' + this.ip + '/api/current_status')
+            .then((response) => {
+                this.log.debug('Done executing update');
+                this.current_status = response;
+                this.current_status_time = Date.now();
+                const callbacks = this.status_callbacks;
+                this.status_callbacks = new Array();
+
+                this.log.debug(`Calling ${callbacks.length} queued callbacks`);
+                callbacks.forEach((element) => {
+                    element(null, response);
+                });
+            })
+            .catch((e) => {
+                this.log.error(`Error parsing current status info: ${e}`);
+                const callbacks = this.status_callbacks;
+                this.status_callbacks = new Array();
+
+                callbacks.forEach((element) => {
+                    element(e);
+                });
+            });
+    }
+
+    sendJSONRequest (url, method = 'GET', payload = null) {
         return new Promise((resolve, reject) => {
 
             const components = URL.parse(url);
@@ -389,15 +487,18 @@ class ValetudoXiaomiVacuum {
                 host: components.host,
                 port: components.port,
                 path: components.pathname,
-                protocol: components.protocol
+                protocol: components.protocol,
+                headers: {'Content-Type': 'application/json'}
             };
     
             const req = http.request(options, (res) => {
+                res.setEncoding('utf8');
+
                 let chunks = '';
                 res.on('data', (chunk) => { chunks += chunk; });
                 res.on('end', () => {
                     try {
-                        this.log.debug(`Response: ${chunks}`);
+                        this.log.debug(`Raw response: ${chunks}`);
                         const parsed = JSON.parse(chunks);
                         resolve(parsed);
                     } catch(e) {
@@ -408,6 +509,13 @@ class ValetudoXiaomiVacuum {
             req.on('error', (err) => {
                 reject(err);
             });
+
+            if (payload) {
+                const stringified = JSON.stringify(payload);
+                this.log(`sending payload: ${stringified}`);
+                req.write(stringified);
+            }
+
             req.end();
         });
     }
