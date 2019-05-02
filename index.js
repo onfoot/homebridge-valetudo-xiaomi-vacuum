@@ -70,7 +70,6 @@ class ValetudoXiaomiVacuum {
         this.speakerService.getCharacteristic(Characteristic.Mute)
             .on('set', this.setMute.bind(this))
             .on('get', this.getMute.bind(this));
-
         this.services.push(this.speakerService);
 
         this.batteryService = new Service.BatteryService(this.name + ' Battery');
@@ -86,25 +85,6 @@ class ValetudoXiaomiVacuum {
         this.services.push(this.batteryService);
 
         this.updateStatus(true);
-    }
-
-    updateInterval() {
-        if (this.current_status !== null) {
-            switch (this.current_status.state) {
-                case ValetudoXiaomiVacuum.STATES.CHARGING:
-                case ValetudoXiaomiVacuum.STATES.IDLE:
-                    return 60000; // slow update interval for idle states
-                default:
-                    return 3000; // fast update interval for non-idle states
-            }
-        } else {
-            return 10000;
-        }
-    }
-
-    setupUpdateTimer() {
-        clearTimeout(this.status_timer);
-        this.status_timer = setTimeout(() => { this.updateStatus(true); }, this.updateInterval());
     }
 
     getBattery(callback) {
@@ -181,11 +161,9 @@ class ValetudoXiaomiVacuum {
 
     identify (callback) {
         this.sendJSONRequest('http://' + this.ip + '/api/find_robot', 'PUT')
-            .then((response) => { })
+            .then((response) => { callback(); })
             .catch((e) => {
                 log.error(`Failed to identify robot: ${e}`);
-            })
-            .finally(() => {
                 callback();
             });
     }
@@ -197,13 +175,15 @@ class ValetudoXiaomiVacuum {
             log.debug('Executing go home');
 
             this.sendJSONRequest('http://' + this.ip + '/api/drive_home', 'PUT')
-                .then((response) => {})
+                .then((response) => {
+                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+                })
                 .catch((e) => {
                     log.error(`Failed to execute go home: ${e}`);
-                })
-                .finally(() => {
                     setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
                 });
+        } else {
+            setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
         }
     }
 
@@ -224,11 +204,11 @@ class ValetudoXiaomiVacuum {
 
     checkVolume (callback) {
         this.sendJSONRequest('http://' + this.ip + '/api/test_sound_volume', 'PUT')
-            .then((response) => {})
+            .then((response) => {
+                callback();
+            })
             .catch((e) => {
                 log.error(`Failed to test volume: ${e}`);
-            })
-            .finally(() => {
                 callback();
             });
     }
@@ -312,16 +292,17 @@ class ValetudoXiaomiVacuum {
             log.debug('Executing cleaning');
 
             this.sendJSONRequest('http://' + this.ip + '/api/start_cleaning', 'PUT')
-                .then((response) => {})
+                .then((response) => {
+                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+                })
                 .catch((e) => {
                     log.error(`Failed to execute start cleaning: ${e}`);
-                })
-                .finally(() => {
-                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+                    setTimeout(() => { callback(e); this.updateStatus(true); }, 3000);
                 });
         } else {
             this.getStatus(true, (err) => {
                 if (err) {
+                    callback(err);
                     return;
                 }
 
@@ -329,6 +310,8 @@ class ValetudoXiaomiVacuum {
                     this.stopCleaning(() => {
                         callback();
                     });
+                } else {
+                    callback();
                 }
             });
         }
@@ -341,6 +324,7 @@ class ValetudoXiaomiVacuum {
 
         this.getStatus(true, (err) => {
             if (err) {
+                callback(err);
                 return;
             }
 
@@ -355,13 +339,13 @@ class ValetudoXiaomiVacuum {
             }
 
             this.sendJSONRequest('http://' + this.ip + '/api/stop_cleaning', 'PUT')
-                .then((response) => {})
-                .catch((e) => {
-                this.log.error(`Failed to execute spot clean: ${e}`);
-                })
-                .finally(() => {
+                .then((response) => {
                     setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
-            });
+                })
+                .catch((e) => {
+                    this.log.error(`Failed to execute spot clean: ${e}`);
+                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+                });
         });
     }
 
@@ -385,13 +369,12 @@ class ValetudoXiaomiVacuum {
             log.debug('Executing spot cleaning');
 
             this.sendJSONRequest('http://' + this.ip + '/api/spot_clean', 'PUT')
-                .then((response) => {})
+                .then((response) => {
+                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+                })
                 .catch((e) => {
                     log.error(`Failed to execute start spot cleaning: ${e}`);
-                })
-                .finally(() => {
-                    callback();
-                    this.updateStatus(true);
+                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
                 });
         } else {
             callback(new Error('Cannot stop spot cleaning'));
@@ -428,9 +411,30 @@ class ValetudoXiaomiVacuum {
 
             this.cleanService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES.CLEANING); // cleaning
             this.goHomeService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES.RETURNING_HOME); // driving home
-
-            this.setupUpdateTimer();
+            this.spotCleanService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES.SPOT_CLEANING); // cleaning
         });
+    }
+
+    updateInterval() {
+        if (this.current_status !== null) {
+            switch (this.current_status.state) {
+                case ValetudoXiaomiVacuum.STATES.CHARGING:
+                case ValetudoXiaomiVacuum.STATES.IDLE:
+                    return 60000; // slow update interval for idle states
+                default:
+                    return 3000; // fast update interval for non-idle states
+            }
+        } else {
+            return 10000;
+        }
+    }
+
+    clearUpdateTimer() {
+        clearTimeout(this.status_timer);
+    }
+
+    setupUpdateTimer() {
+        this.status_timer = setTimeout(() => { this.updateStatus(true); }, this.updateInterval());
     }
 
     getStatus(forced, callback) {
@@ -450,6 +454,8 @@ class ValetudoXiaomiVacuum {
                 return;
         }
 
+        this.clearUpdateTimer();
+
         this.log.debug(`Executing update, forced: ${forced}`);
         this.status_callbacks.push(callback);
 
@@ -465,6 +471,7 @@ class ValetudoXiaomiVacuum {
                 callbacks.forEach((element) => {
                     element(null, response);
                 });
+                this.setupUpdateTimer();
             })
             .catch((e) => {
                 this.log.error(`Error parsing current status info: ${e}`);
@@ -474,6 +481,8 @@ class ValetudoXiaomiVacuum {
                 callbacks.forEach((element) => {
                     element(e);
                 });
+
+                this.setupUpdateTimer();
             });
     }
 
