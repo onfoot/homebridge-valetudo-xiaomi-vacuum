@@ -422,7 +422,7 @@ class ValetudoXiaomiVacuum {
                 case ValetudoXiaomiVacuum.STATES.IDLE:
                     return 60000; // slow update interval for idle states
                 default:
-                    return 3000; // fast update interval for non-idle states
+                    return 5000; // fast update interval for non-idle states
             }
         } else {
             return 10000;
@@ -493,7 +493,7 @@ class ValetudoXiaomiVacuum {
 
             const options = {
                 method: method,
-                host: components.host,
+                host: components.hostname,
                 port: components.port,
                 path: components.pathname,
                 protocol: components.protocol,
