@@ -21,6 +21,7 @@ class ValetudoXiaomiVacuum {
         this.log = log;
         this.name = config.name || 'Vacuum';
         this.ip = config.ip;
+        this.notification_port = config.notification_port || null;
         this.current_status = null;
         this.status_callbacks = new Array();
         this.current_status_time = null;
@@ -28,6 +29,17 @@ class ValetudoXiaomiVacuum {
 
         if (!this.ip) {
             throw new Error('You must provide an ip address of the vacuum cleaner.');
+        }
+
+        if (this.notification_port) {
+            this.log.debug(`Starting status notification server at port ${this.notification_port}`);
+            this.notification_server = http.createServer((req, res) => {
+                this.log.debug(`Handling notification payload`);
+                this.serverHandler(req, res);
+            });
+            this.notification_server.listen(this.notification_port, () => {
+                this.log.debug(`Started status notification server at port ${this.notification_port}`);
+            });
         }
 
         // HOMEKIT SERVICES
@@ -85,6 +97,20 @@ class ValetudoXiaomiVacuum {
         this.services.push(this.batteryService);
 
         this.updateStatus(true);
+    }
+
+    serverHandler(req, res) {
+        if (req.url.startsWith('/status')) {
+            this.log.debug(`Status update notification received`);
+            this.updateStatus(true);
+            res.writeHead(200);
+            res.end('OK');
+
+            return;
+        }
+
+        res.writeHead(404);
+        res.end('Not Found');
     }
 
     getBattery(callback) {
@@ -434,6 +460,9 @@ class ValetudoXiaomiVacuum {
     }
 
     setupUpdateTimer() {
+        if (this.notification_server) { // don't schedule status updates for polling - we have them pushed by the vacuum
+            return;
+        }
         this.status_timer = setTimeout(() => { this.updateStatus(true); }, this.updateInterval());
     }
 
