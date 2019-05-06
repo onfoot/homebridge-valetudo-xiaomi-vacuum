@@ -20,6 +20,21 @@ class ValetudoXiaomiVacuum {
         this.services = [];
         this.log = log;
         this.name = config.name || 'Vacuum';
+
+        let powerControl = config['power-control'];
+        if (powerControl) {
+            let defaultSpeedValue = this.getSpeedValue(powerControl['default-speed'] || 'quiet');
+            let highSpeedValue = this.getSpeedValue(powerControl['high-speed'] || 'turbo');
+
+            this.powerControl = {
+                defaultSpeed: defaultSpeedValue,
+                highSpeed: highSpeedValue,
+                mop: powerControl['mop-enabled']
+            };
+
+            this.log.debug(`Setting power control: default speed - ${this.powerControl.defaultSpeed}, high speed - ${this.powerControl.highSpeed}, mop enabled - ${this.powerControl.mop}`);
+        }
+
         this.ip = config.ip;
         this.current_status = null;
         this.status_callbacks = new Array();
@@ -63,6 +78,22 @@ class ValetudoXiaomiVacuum {
             .on('get', this.isSpotCleaning.bind(this));
         this.services.push(this.spotCleanService);
 
+        if (this.powerControl) {
+            this.highSpeedService = new Service.Switch('High speed mode ' + this.name, 'highspeed');
+            this.highSpeedService.getCharacteristic(Characteristic.On)
+                .on('set', this.setHighSpeedMode.bind(this))
+                .on('get', this.getHighSpeedMode.bind(this));
+            this.services.push(this.highSpeedService);
+
+            if (this.powerControl.mop) {
+                this.mopService = new Service.Switch('Mopping mode ' + this.name, 'mopspeed');
+                this.mopService.getCharacteristic(Characteristic.On)
+                    .on('set', this.setMopMode.bind(this))
+                    .on('get', this.getMopMode.bind(this));
+                this.services.push(this.mopService);
+            }
+        }
+
         this.speakerService = new Service.Speaker(this.name, 'speaker');
         this.speakerService.getCharacteristic(Characteristic.Volume)
             .on('set', this.setVolume.bind(this))
@@ -85,6 +116,79 @@ class ValetudoXiaomiVacuum {
         this.services.push(this.batteryService);
 
         this.updateStatus(true);
+    }
+
+    getHighSpeedMode(callback) {
+        this.getStatus(false, (error) => {
+            if (error) {
+                callback(error);
+            } else {
+                callback(null, this.current_status['fan_power'] === this.powerControl.highSpeed);
+            }
+        });
+    }
+
+    getMopMode(callback) {
+        this.getStatus(false, (error) => {
+            if (error) {
+                callback(error);
+            } else {
+                callback(null, this.current_status['fan_power'] === ValetudoXiaomiVacuum.SPEEDS.mop);
+            }
+        });
+    }
+
+    setFanSpeed(value, callback) {
+        this.log.debug(`Setting fan power to ${value}`);
+        this.sendJSONRequest('http://' + this.ip + '/api/fanspeed', 'PUT', {speed: value})
+        .then((response) => {
+            callback();
+            this.updateStatus (true);
+        })
+        .catch((e) => {
+            this.log.error(`Failed to change fan power: ${e}`);
+            callback();
+        });
+    }
+
+    setHighSpeedMode(on, callback) {
+        if (on) {
+            if (this.highSpeedMode) {
+                callback(null);
+                return;
+            } else {
+                this.setFanSpeed(this.powerControl.highSpeed, callback);
+                return;
+            }
+        } else {
+            if (this.highSpeedMode) {
+                this.setFanSpeed(this.powerControl.defaultSpeed, callback);
+                return;
+            } else {
+                callback(null);
+                return;
+            }
+        }
+    }
+
+    setMopMode(on, callback) {
+        if (on) {
+            if (this.mopMode) {
+                callback(null);
+                return;
+            } else {
+                this.setFanSpeed(ValetudoXiaomiVacuum.SPEEDS.mop, callback);
+                return;
+            }
+        } else {
+            if (this.mopMode) {
+                this.setFanSpeed(this.powerControl.defaultSpeed, callback);
+                return;
+            } else {
+                callback(null);
+                return;
+            }
+        }
     }
 
     getBattery(callback) {
@@ -412,6 +516,15 @@ class ValetudoXiaomiVacuum {
             this.cleanService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES.CLEANING); // cleaning
             this.goHomeService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES.RETURNING_HOME); // driving home
             this.spotCleanService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES.SPOT_CLEANING); // cleaning
+
+            if (this.powerControl) {
+                this.highSpeedMode = this.current_status['fan_power'] === this.powerControl.highSpeed;
+                this.highSpeedService.updateCharacteristic(Characteristic.On, this.highSpeedMode);
+                if (this.powerControl.mop) {
+                    this.mopMode = this.current_status['fan_power'] === ValetudoXiaomiVacuum.SPEEDS.mop;
+                    this.mopService.updateCharacteristic(Characteristic.On, this.mopMode);
+                }
+            }
         });
     }
 
@@ -420,9 +533,9 @@ class ValetudoXiaomiVacuum {
             switch (this.current_status.state) {
                 case ValetudoXiaomiVacuum.STATES.CHARGING:
                 case ValetudoXiaomiVacuum.STATES.IDLE:
-                    return 60000; // slow update interval for idle states
+                    return 120000; // slow update interval for idle states
                 default:
-                    return 5000; // fast update interval for non-idle states
+                    return 10000; // fast update interval for non-idle states
             }
         } else {
             return 10000;
@@ -528,6 +641,17 @@ class ValetudoXiaomiVacuum {
             req.end();
         });
     }
+
+    getSpeedValue(preset) {
+        switch (preset) {
+            case 'quiet': return ValetudoXiaomiVacuum.SPEEDS.quiet;
+            case 'balanced': return ValetudoXiaomiVacuum.SPEEDS.balanced;
+            case 'turbo': return ValetudoXiaomiVacuum.SPEEDS.turbo;
+            case 'max': return ValetudoXiaomiVacuum.SPEEDS.max;
+            case 'mop': return ValetudoXiaomiVacuum.SPEEDS.mop;
+            default: throw Error(`Invalid power preset given: ${preset}`);
+        }
+    }
 }
 
 ValetudoXiaomiVacuum.STATES = {
@@ -548,4 +672,12 @@ ValetudoXiaomiVacuum.STATES = {
     DOCKING: 15,
     GOING_TO_TARGET: 16,
     ZONE_CLEANING: 17
+};
+
+ValetudoXiaomiVacuum.SPEEDS = {
+    quiet: 101,
+    balanced: 102,
+    turbo: 103,
+    max: 104,
+    mop: 105
 };
