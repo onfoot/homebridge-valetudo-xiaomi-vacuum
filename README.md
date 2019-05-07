@@ -41,4 +41,4 @@ Example:
 
 ## Compatibility
 
-Tested on Roborock S50 with Valetudo 0.3.1 and v001748.
+Tested on Roborock S50 with firmware v001748 and Valetudo 0.3.1.
