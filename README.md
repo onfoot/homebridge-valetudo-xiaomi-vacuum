@@ -15,8 +15,8 @@ Example:
 ```
 {
     "accessory": "ValetudoXiaomiVacuum",
-    "name": "<optional, Vacuum by default>",
-    "ip": "<vacuum ip address>"
+    "name": "<Accessory name, e.g. Vacuum>",
+    "ip": "<Vacuum's ip address>"
 }
 ```
 
