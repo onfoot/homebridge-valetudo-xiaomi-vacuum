@@ -42,3 +42,7 @@ Example:
 ## Compatibility
 
 Tested on Roborock S50 with firmware v001748 and Valetudo 0.3.1.
+
+## Vacuum map in Home app
+
+I played a little with an idea of setting up a HomeKit camera that grabs the generated Vacuum image and streams it as a video. [The idea issue](https://github.com/onfoot/homebridge-valetudo-xiaomi-vacuum/issues/2#issuecomment-572278178) contains more details.
