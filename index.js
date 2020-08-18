@@ -572,7 +572,7 @@ class ValetudoXiaomiVacuum {
         this.log.debug(`Executing update, forced: ${forced}`);
         this.status_callbacks.push(callback);
 
-        this.sendJSONRequest('http://' + this.ip + '/api/current_status')
+        this.sendJSONRequest('http://' + this.ip + '/api/state')
             .then((response) => {
                 this.log.debug('Done executing update');
                 this.current_status = response;
