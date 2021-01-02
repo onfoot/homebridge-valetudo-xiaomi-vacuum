@@ -414,7 +414,7 @@ class ValetudoXiaomiVacuum {
                 }
 
                 if (this.current_status.state === ValetudoXiaomiVacuum.STATES.CLEANING) {
-                    this.stopCleaning(() => {
+                    this.pauseCleaning(() => {
                         callback();
                     });
                 } else {
@@ -424,6 +424,37 @@ class ValetudoXiaomiVacuum {
         }
     }
 
+    pauseCleaning (callback) {
+        var log = this.log;
+
+        log.debug('Executing stop cleaning');
+
+        this.getStatus(true, (err) => {
+            if (err) {
+                callback(err);
+                return;
+            }
+
+            if (this.current_status.state == ValetudoXiaomiVacuum.STATES.ERROR ||
+                this.current_status.state == ValetudoXiaomiVacuum.STATES.DOCKED ||
+                this.current_status.state == ValetudoXiaomiVacuum.STATES.IDLE ||
+                this.current_status.state == ValetudoXiaomiVacuum.STATES.RETURNING ||
+                this.current_status.state == ValetudoXiaomiVacuum.STATES.MANUAL_CONTROL ||
+                this.current_status.state == ValetudoXiaomiVacuum.STATES.MOVING) {
+                    callback(new Error('Cannot stop cleaning in current state'));
+            }
+
+            this.sendJSONRequest('http://' + this.ip + '/api/pause_cleaning', 'PUT', null, true)
+                .then((response) => {
+                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+                })
+                .catch((e) => {
+                    this.log.error(`Failed to execute spot clean: ${e}`);
+                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+                });
+        });
+    }
+    
     stopCleaning (callback) {
         var log = this.log;
 
@@ -707,9 +738,9 @@ ValetudoXiaomiVacuum.BATTERY = {
 
 ValetudoXiaomiVacuum.SPEEDS = {
     OFF: 'off',
-    MIN: 'min',
-    LOW: 'low',
-    MEDIUM: 'medium',
+    MIN: 'low',
+    LOW: 'medium',
+    MEDIUM: 'high',
     MAX: 'max'
 };
 
