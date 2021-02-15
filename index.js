@@ -133,7 +133,6 @@ class ValetudoXiaomiVacuum {
             if (error) {
                 callback(error);
             } else {
-                this.log.debug('IS THIS MOP MODE? Current status is ', this.current_status['fan_power']);
                 callback(null, this.current_status['fan_power'] === ValetudoXiaomiVacuum.SPEEDS.MIN);
             }
         });
@@ -281,7 +280,7 @@ class ValetudoXiaomiVacuum {
         if (state) {
             log.debug('Executing go home');
 
-            this.sendJSONRequest('http://' + this.ip + '/api/drive_home', 'PUT')
+            this.sendJSONRequest('http://' + this.ip + '/api/drive_home', 'PUT', null, true)
                 .then((response) => {
                     setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
                 })
