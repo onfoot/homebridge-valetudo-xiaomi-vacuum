@@ -39,6 +39,21 @@ Example:
 }
 ```
 
+## Valetudo RE
+
+If running your vacuum using Valetudo RE, `legacy-mode` needs to be set to `true`.
+
+Example:
+
+```
+{
+    "accessory": "ValetudoXiaomiVacuum",
+    "name": "<Accessory name, e.g. Vacuum>",
+    "ip": "<Vacuum's ip address>",
+    "legacy-mode": true
+}
+```
+
 ## Compatibility
 
 Tested on Roborock S50 with firmware v001748 and Valetudo 0.6.1.
