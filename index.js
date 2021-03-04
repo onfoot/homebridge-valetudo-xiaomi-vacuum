@@ -21,7 +21,7 @@ class ValetudoXiaomiVacuum {
         this.log = log;
         this.name = config.name || 'Vacuum';
 
-        this.legacy_mode = config['legacy-mode'];
+        this.legacy_mode = config['legacy-mode'] == true;
 
         if (!this.legacy_mode) {
             this.statusUrl = this.statusUrlModern;
@@ -35,6 +35,8 @@ class ValetudoXiaomiVacuum {
             this.isSpotCleaning = this.isSpotCleaningModern;
             this.updateStatus = this.updateStatusModern;
             this.updateInterval = this.updateIntervalModern;
+            this.getVersion = this.getVersionModern;
+            this.isCleaning = this.isCleaningModern;
         } else {
             this.statusUrl = this.statusUrlLegacy;
             this.parseStatus = this.parseStatusLegacy;
@@ -47,17 +49,26 @@ class ValetudoXiaomiVacuum {
             this.isSpotCleaning = this.isSpotCleaningLegacy;
             this.updateStatus = this.updateStatusLegacy;
             this.updateInterval = this.updateIntervalLegacy;
+            this.getVersion = this.getVersionLegacy;
+            this.isCleaning = this.isCleaningLegacy;
         }
 
         let powerControl = config['power-control'];
+
         if (powerControl) {
-            let defaultSpeedValue = this.getSpeedValue(powerControl['default-speed'] || 'low');
-            let highSpeedValue = this.getSpeedValue(powerControl['high-speed'] || 'max');
+
+            this.log.debug(`PowerControl's default speed is ${powerControl['default-speed']}`);
+
+            const defaultSpeedValue = this.getSpeedValue(powerControl['default-speed'] || (this.legacy_mode ? 'balanced' : 'medium'));
+
+            this.log.debug(`PowerControl's corrected speed is ${defaultSpeedValue}`);
+
+            const highSpeedValue = this.getSpeedValue(powerControl['high-speed'] || (this.legacy_mode ? 'turbo' : 'max'));
 
             this.powerControl = {
                 defaultSpeed: defaultSpeedValue,
                 highSpeed: highSpeedValue,
-                mop: powerControl['mop-enabled']
+                mop: powerControl['mop-enabled'] == true
             };
 
             this.log.debug(`Setting power control: default speed - ${this.powerControl.defaultSpeed}, high speed - ${this.powerControl.highSpeed}, mop enabled - ${this.powerControl.mop}`);
@@ -75,7 +86,6 @@ class ValetudoXiaomiVacuum {
             throw new Error('You must provide an ip address of the vacuum cleaner.');
         }
 
-        // HOMEKIT SERVICES
         this.serviceInfo = new Service.AccessoryInformation();
         this.serviceInfo
             .setCharacteristic(Characteristic.Manufacturer, 'Xiaomi')
@@ -124,15 +134,6 @@ class ValetudoXiaomiVacuum {
             }
         }
 
-        this.speakerService = new Service.Speaker(this.name, 'speaker');
-        this.speakerService.getCharacteristic(Characteristic.Volume)
-            .on('set', this.setVolume.bind(this))
-            .on('get', this.getVolume.bind(this));
-        this.speakerService.getCharacteristic(Characteristic.Mute)
-            .on('set', this.setMute.bind(this))
-            .on('get', this.getMute.bind(this));
-        this.services.push(this.speakerService);
-
         this.batteryService = new Service.BatteryService(this.name + ' Battery');
         this.batteryService
             .getCharacteristic(Characteristic.BatteryLevel)
@@ -148,12 +149,12 @@ class ValetudoXiaomiVacuum {
         this.updateStatus(true);
     }
 
-    statusUrlModern(ip) {
+    statusUrlModern (ip) {
         return 'http://' + ip + '/api/state';
         
     }
 
-    statusUrlLegacy(ip) {
+    statusUrlLegacy (ip) {
         return 'http://' + ip + '/api/current_status';
     }
 
@@ -180,11 +181,11 @@ class ValetudoXiaomiVacuum {
         return simpleStatus;
     }
 
-    parseStatusLegacy(response) {
+    parseStatusLegacy (response) {
         return response;
     }
 
-    getHighSpeedMode(callback) {
+    getHighSpeedMode (callback) {
         this.getStatus(false, (error) => {
             if (error) {
                 callback(error);
@@ -194,7 +195,7 @@ class ValetudoXiaomiVacuum {
         });
     }
 
-    getMopModeModern(callback) {
+    getMopModeModern (callback) {
         this.getStatus(false, (error) => {
             if (error) {
                 callback(error);
@@ -204,7 +205,7 @@ class ValetudoXiaomiVacuum {
         });
     }
 
-    getMopModeLegacy(callback) {
+    getMopModeLegacy (callback) {
         this.getStatus(false, (error) => {
             if (error) {
                 callback(error);
@@ -215,7 +216,7 @@ class ValetudoXiaomiVacuum {
     }
 
 
-    setFanSpeed(value, callback) {
+    setFanSpeed (value, callback) {
         this.log.debug(`Setting fan power to ${value}`);
         this.sendJSONRequest('http://' + this.ip + '/api/fanspeed', 'PUT', {speed: value}, true)
         .then((response) => {
@@ -228,7 +229,7 @@ class ValetudoXiaomiVacuum {
         });
     }
 
-    setHighSpeedMode(on, callback) {
+    setHighSpeedMode (on, callback) {
         if (on) {
             if (this.highSpeedMode) {
                 callback(null);
@@ -248,7 +249,7 @@ class ValetudoXiaomiVacuum {
         }
     }
 
-    setMopModeModern(on, callback) {
+    setMopModeModern (on, callback) {
         if (on) {
             if (this.mopMode) {
                 callback(null);
@@ -268,7 +269,7 @@ class ValetudoXiaomiVacuum {
         }
     }
 
-    setMopModeLegacy(on, callback) {
+    setMopModeLegacy (on, callback) {
         if (on) {
             if (this.mopMode) {
                 callback(null);
@@ -288,7 +289,7 @@ class ValetudoXiaomiVacuum {
         }
     }
 
-    getBattery(callback) {
+    getBattery (callback) {
         this.getStatus(false, (error) => {
             if (error) {
                 callback(error);
@@ -299,7 +300,7 @@ class ValetudoXiaomiVacuum {
     }
     
 
-    getChargingModern(callback) {
+    getChargingModern (callback) {
         this.getStatus(false, (error) => {
             if (error) {
                 callback(error);
@@ -317,12 +318,13 @@ class ValetudoXiaomiVacuum {
     }
 
 
-    getChargingLegacy(callback) {
+    getChargingLegacy (callback) {
         this.getStatus(false, (error) => {
             if (error) {
                 callback(error);
             } else {
                 if (this.current_status.state === ValetudoXiaomiVacuum.STATES_LEGACY.CHARGING) {
+                    this.log.debug('CHARGING!');
                     callback(null, Characteristic.ChargingState.CHARGING);
                 } else if (this.current_status.state === ValetudoXiaomiVacuum.STATES_LEGACY.CHARGER_DISCONNECTED || this.current_status.state === ValetudoXiaomiVacuum.STATES_LEGACY.CHARGING_PROBLEM) {
                     callback(null, Characteristic.ChargingState.NOT_CHARGEABLE);
@@ -334,7 +336,7 @@ class ValetudoXiaomiVacuum {
         });
     }
 
-    getBatteryLow(callback) {
+    getBatteryLow (callback) {
         this.getStatus(false, (error) => {
             if (error) {
                 callback(error);
@@ -352,8 +354,8 @@ class ValetudoXiaomiVacuum {
         return this.services;
     }
 
-    getVersion(callback) {
-        this.sendJSONRequest('http://' + this.ip + '/api/fw_version')
+    getVersionModern (callback) {
+        this.sendJSONRequest('http://' + this.ip + '/api/v2/valetudo/version')
             .then((response) => {
                 callback(null, response.version);
             })
@@ -363,7 +365,18 @@ class ValetudoXiaomiVacuum {
             });
     }
 
-    doFind(state, callback) {
+    getVersionLegacy (callback) {
+        this.sendJSONRequest('http://' + this.ip + '/api/get_fw_version')
+            .then((response) => {
+                callback(null, response.version);
+            })
+            .catch((e) => {
+                this.log.error(`Error parsing firmware info: ${e}`);
+                callback(e);
+            });
+    }
+
+    doFind (state, callback) {
         var log = this.log;
 
         if (state) {
@@ -437,89 +450,6 @@ class ValetudoXiaomiVacuum {
 
             callback(null, this.current_status.state === ValetudoXiaomiVacuum.STATES.RETURNING_HOME);
         });
-    }
-
-    checkVolume (callback) {
-        this.sendJSONRequest('http://' + this.ip + '/api/test_sound_volume', 'PUT', null, true)
-            .then((response) => {
-                callback();
-            })
-            .catch((e) => {
-                log.error(`Failed to test volume: ${e}`);
-                callback();
-            });
-    }
-
-    setVolume (value, callback) {
-        var log = this.log;
-
-        const volume = Math.max(1, value);
-
-        log.debug(`Setting volume to ${volume}`);
-        this.sendJSONRequest('http://' + this.ip + '/api/set_sound_volume', 'PUT', {volume: volume}, true)
-            .then((response) => {
-                this.checkVolume ( () => {
-                    callback();
-                });
-            })
-            .catch((e) => {
-                log.error(`Failed to change volume: ${e}`);
-                callback();
-            });
-    }
-
-    updateVolume (callback) {
-        this.getVolume((err, volume) => {
-            if (err) {
-                callback(err);
-                return;
-            }
-
-            this.speakerService.updateCharacteristic(Characteristic.Volume, volume);
-            callback();
-        });
-    }
-
-    getVolume (callback) {
-        var log = this.log;
-
-        this.sendJSONRequest('http://' + this.ip + '/api/get_sound_volume', 'GET')
-            .then((response) => {
-                log.debug(`Got volume: ${response}`);
-                callback(null, response);
-            })
-            .catch((e) => {
-                log.error(`Failed to get volume: ${e}`);
-                callback(e);
-            });
-    }
-
-    setMute (mute, callback) {
-        var log = this.log;
-
-        log.debug(`Setting mute to ${mute}`);
-
-        const value = mute ? 1 : 100;
-
-        this.setVolume(value, () => {
-            this.updateVolume( () => {
-                callback();
-            });
-        });
-    }
-
-    getMute (callback) {
-        var log = this.log;
-
-        this.sendJSONRequest('http://' + this.ip + '/api/get_sound_volume', 'GET')
-            .then((response) => {
-                log.debug(`Got volume for Mute: ${response.volume}`);
-                callback(null, response.volume < 10 ? true : false);
-            })
-            .catch((e) => {
-                log.error(`Failed to get volume for Mute: ${e}`);
-                callback(e);
-            });
     }
 
     startCleaning (state, callback) {
@@ -617,7 +547,7 @@ class ValetudoXiaomiVacuum {
         });
     }
 
-    isCleaning (callback) {
+    isCleaningModern (callback) {
         this.getStatus(false, (error) => {
 
             this.log.debug(`Is cleaning? error: ${error}, state: ${this.current_status !== null ? this.current_status.state : null}`);
@@ -627,6 +557,19 @@ class ValetudoXiaomiVacuum {
             }
 
             callback(null, this.current_status.state === ValetudoXiaomiVacuum.STATES.CLEANING);
+        });
+    }
+
+    isCleaningLegacy (callback) {
+        this.getStatus(false, (error) => {
+
+            this.log.debug(`Is cleaning? error: ${error}, state: ${this.current_status !== null ? this.current_status.state : null}`);
+
+            if (error) {
+                return callback(error);
+            }
+
+            callback(null, this.current_status.state === ValetudoXiaomiVacuum.STATES_LEGACY.CLEANING);
         });
     }
 
@@ -685,8 +628,10 @@ class ValetudoXiaomiVacuum {
             this.log.debug('Updating characteristics');
 
             this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, this.current_status.battery);
-            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery < 20
+            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery < 10
                 ? Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW : Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL);
+
+            this.log.debug(`Battery status: ${this.current_status.battery_status}`);
             this.batteryService.updateCharacteristic(Characteristic.ChargingState, this.current_status.battery_status === ValetudoXiaomiVacuum.BATTERY.CHARGING
                 ? Characteristic.ChargingState.CHARGING : Characteristic.ChargingState.NOT_CHARGING);
 
@@ -705,7 +650,6 @@ class ValetudoXiaomiVacuum {
         });
     }
 
-
     updateStatusLegacy(forced = false) {
         this.log.debug('Updating vacuum status');
         this.getStatus(forced, (err) => {
@@ -716,14 +660,15 @@ class ValetudoXiaomiVacuum {
             this.log.debug('Updating characteristics');
 
             this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, this.current_status.battery);
-            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery < 20
+            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery < 10
                 ? Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW : Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL);
-            this.batteryService.updateCharacteristic(Characteristic.ChargingState, this.current_status.state == ValetudoXiaomiVacuum.STATES.CHARGING
+
+            this.batteryService.updateCharacteristic(Characteristic.ChargingState, this.current_status.state == ValetudoXiaomiVacuum.STATES_LEGACY.CHARGING
                 ? Characteristic.ChargingState.CHARGING : Characteristic.ChargingState.NOT_CHARGING);
 
-            this.cleanService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES.CLEANING); // cleaning
-            this.goHomeService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES.RETURNING_HOME); // driving home
-            this.spotCleanService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES.SPOT_CLEANING); // cleaning
+            this.cleanService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES_LEGACY.CLEANING); // cleaning
+            this.goHomeService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES_LEGACY.RETURNING_HOME); // driving home
+            this.spotCleanService.updateCharacteristic(Characteristic.On, this.current_status.state == ValetudoXiaomiVacuum.STATES_LEGACY.SPOT_CLEANING); // cleaning
 
             if (this.powerControl) {
                 this.highSpeedMode = this.current_status['fan_power'] === this.powerControl.highSpeed;
@@ -876,15 +821,16 @@ class ValetudoXiaomiVacuum {
     }
 
     getSpeedValueModern(preset) {
+        this.log.debug(`speed for ${preset}`);
         switch (preset) {
-            case 'off': return ValetudoXiaomiVacuum.SPEEDS.off;
-            case 'min': return ValetudoXiaomiVacuum.SPEEDS.min;
-            case 'quiet': return ValetudoXiaomiVacuum.SPEEDS.min;
-            case 'low': return ValetudoXiaomiVacuum.SPEEDS.low;
-            case 'medium': return ValetudoXiaomiVacuum.SPEEDS.medium;
-            case 'max': return ValetudoXiaomiVacuum.SPEEDS.max;
-            case 'turbo': return ValetudoXiaomiVacuum.SPEEDS.max;
-            case 'mop': return ValetudoXiaomiVacuum.SPEEDS.min;
+            case 'min': return ValetudoXiaomiVacuum.SPEEDS.MIN;
+            case 'quiet': return ValetudoXiaomiVacuum.SPEEDS.MIN;
+            case 'low': return ValetudoXiaomiVacuum.SPEEDS.LOW;
+            case 'medium': return ValetudoXiaomiVacuum.SPEEDS.MEDIUM;
+            case 'balanced': return ValetudoXiaomiVacuum.SPEEDS.MEDIUM;
+            case 'max': return ValetudoXiaomiVacuum.SPEEDS.MAX;
+            case 'turbo': return ValetudoXiaomiVacuum.SPEEDS.MAX;
+            case 'mop': return ValetudoXiaomiVacuum.SPEEDS.MIN;
             default: throw Error(`Invalid power preset given: ${preset}`);
         }
     }
@@ -914,23 +860,24 @@ ValetudoXiaomiVacuum.STATES = {
 
 
 ValetudoXiaomiVacuum.STATES_LEGACY = {
-    STARTING: 'STARTING',
-    CHARGER_DISCONNECTED: 'CHARGER_DISCONNECTED',
-    IDLE: 'IDLE',
-    REMOTE_ACTIVE: 'REMOTE_ACTIVE',
-    CLEANING: 'CLEANING',
-    RETURNING_HOME: 'RETURNING_HOME',
-    MANUAL_MODE: 'MANUAL_MODE',
-    CHARGING: 'CHARGING',
-    CHARGING_PROBLEM: 'CHARGING_PROBLEM',
-    PAUSED: 'PAUSED',
-    SPOT_CLEANING: 'SPOT_CLEANING',
-    ERROR: 'ERROR',
-    SHUTTING_DOWN: 'SHUTTING_DOWN',
-    UPDATING: 'UPDATING',
-    DOCKING: 'DOCKING',
-    GOING_TO_TARGET: 'GOING_TO_TARGET',
-    ZONE_CLEANING: 'ZONE_CLEANING'
+    STARTING: '1',
+    CHARGER_DISCONNECTED: '2',
+    IDLE: '3',
+    REMOTE_ACTIVE: '4',
+    CLEANING: '5',
+    RETURNING_HOME: '6',
+    MANUAL_MODE: '7',
+    CHARGING: '8',
+    CHARGING_PROBLEM: '9',
+    PAUSED: '10',
+    SPOT_CLEANING: '11',
+    ERROR: '12',
+    SHUTTING_DOWN: '13',
+    UPDATING: '14',
+    DOCKING: '15',
+    GOING_TO_TARGET: '16',
+    ZONE_CLEANING: '17',
+    ROOMS_CLEANING: '18'
 };
 
 
@@ -951,10 +898,10 @@ ValetudoXiaomiVacuum.SPEEDS = {
 };
 
 ValetudoXiaomiVacuum.SPEEDS_LEGACY = {
-    quiet: 101,
-    balanced: 102,
-    turbo: 103,
-    max: 104,
+    quiet: 38,
+    balanced: 60,
+    turbo: 75,
+    max: 100,
     mop: 105
 };
 
