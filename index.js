@@ -341,7 +341,7 @@ class ValetudoXiaomiVacuum {
             if (error) {
                 callback(error);
             } else {
-                if (this.current_status.battery_level < 20) {
+                if (this.current_status.battery_level < 10) {
                     callback(null, Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW);
                 } else {
                     callback(null, Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL);
@@ -627,8 +627,8 @@ class ValetudoXiaomiVacuum {
 
             this.log.debug('Updating characteristics');
 
-            this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, this.current_status.battery);
-            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery < 10
+            this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, this.current_status.battery_level);
+            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery_level < 10
                 ? Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW : Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL);
 
             this.log.debug(`Battery status: ${this.current_status.battery_status}`);
@@ -659,8 +659,8 @@ class ValetudoXiaomiVacuum {
 
             this.log.debug('Updating characteristics');
 
-            this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, this.current_status.battery);
-            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery < 10
+            this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, this.current_status.battery_level);
+            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery_level < 10
                 ? Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW : Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL);
 
             this.batteryService.updateCharacteristic(Characteristic.ChargingState, this.current_status.state == ValetudoXiaomiVacuum.STATES_LEGACY.CHARGING
