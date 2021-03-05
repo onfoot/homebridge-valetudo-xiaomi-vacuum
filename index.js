@@ -171,7 +171,7 @@ class ValetudoXiaomiVacuum {
                     simpleStatus['fan_power'] = value['value'];
                     break;
                 case 'BatteryStateAttribute':
-                    simpleStatus['battery_level'] = value['level'];
+                    simpleStatus['battery'] = value['level'];
                     simpleStatus['battery_status'] = value['flag'];
                     break;
             }
@@ -294,7 +294,7 @@ class ValetudoXiaomiVacuum {
             if (error) {
                 callback(error);
             } else {
-                callback(null, this.current_status.battery_level);
+                callback(null, this.current_status.battery);
             }
         });
     }
@@ -341,7 +341,7 @@ class ValetudoXiaomiVacuum {
             if (error) {
                 callback(error);
             } else {
-                if (this.current_status.battery_level < 10) {
+                if (this.current_status.battery < 10) {
                     callback(null, Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW);
                 } else {
                     callback(null, Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL);
@@ -627,8 +627,8 @@ class ValetudoXiaomiVacuum {
 
             this.log.debug('Updating characteristics');
 
-            this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, this.current_status.battery_level);
-            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery_level < 10
+            this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, this.current_status.battery);
+            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery < 10
                 ? Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW : Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL);
 
             this.log.debug(`Battery status: ${this.current_status.battery_status}`);
@@ -659,8 +659,10 @@ class ValetudoXiaomiVacuum {
 
             this.log.debug('Updating characteristics');
 
-            this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, this.current_status.battery_level);
-            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery_level < 10
+            this.log.debug(`Battery state: ${this.current_status.battery}`);
+
+            this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, this.current_status.battery);
+            this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, this.current_status.battery < 10
                 ? Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW : Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL);
 
             this.batteryService.updateCharacteristic(Characteristic.ChargingState, this.current_status.state == ValetudoXiaomiVacuum.STATES_LEGACY.CHARGING
@@ -860,24 +862,24 @@ ValetudoXiaomiVacuum.STATES = {
 
 
 ValetudoXiaomiVacuum.STATES_LEGACY = {
-    STARTING: '1',
-    CHARGER_DISCONNECTED: '2',
-    IDLE: '3',
-    REMOTE_ACTIVE: '4',
-    CLEANING: '5',
-    RETURNING_HOME: '6',
-    MANUAL_MODE: '7',
-    CHARGING: '8',
-    CHARGING_PROBLEM: '9',
-    PAUSED: '10',
-    SPOT_CLEANING: '11',
-    ERROR: '12',
-    SHUTTING_DOWN: '13',
-    UPDATING: '14',
-    DOCKING: '15',
-    GOING_TO_TARGET: '16',
-    ZONE_CLEANING: '17',
-    ROOMS_CLEANING: '18'
+    STARTING: 1,
+    CHARGER_DISCONNECTED: 2,
+    IDLE: 3,
+    REMOTE_ACTIVE: 4,
+    CLEANING: 5,
+    RETURNING_HOME: 6,
+    MANUAL_MODE: 7,
+    CHARGING: 8,
+    CHARGING_PROBLEM: 9,
+    PAUSED: 10,
+    SPOT_CLEANING: 11,
+    ERROR: 12,
+    SHUTTING_DOWN: 13,
+    UPDATING: 14,
+    DOCKING: 15,
+    GOING_TO_TARGET: 16,
+    ZONE_CLEANING: 17,
+    ROOMS_CLEANING: 18
 };
 
 
