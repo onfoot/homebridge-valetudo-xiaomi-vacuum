@@ -30,8 +30,12 @@ class ValetudoXiaomiVacuum {
             this.getCharging = this.getChargingModern;
             this.getMopMode = this.getMopModeModern;
             this.setMopMode = this.setMopModeModern;
+            this.goHome = this.goHomeModern;
+            this.doFind = this.doFindModern;
             this.isGoingHome = this.isGoingHomeModern;
+            this.startCleaning = this.startCleaningModern;
             this.stopCleaning = this.stopCleaningModern;
+            this.setFanSpeed = this.setFanSpeedModern;
             this.isSpotCleaning = this.isSpotCleaningModern;
             this.updateStatus = this.updateStatusModern;
             this.updateInterval = this.updateIntervalModern;
@@ -44,8 +48,12 @@ class ValetudoXiaomiVacuum {
             this.getCharging = this.getChargingLegacy;
             this.getMopMode = this.getMopModeLegacy;
             this.setMopMode = this.setMopModeLegacy;
+            this.goHome = this.goHomeLegacy;
+            this.doFind = this.doFindLegacy;
             this.isGoingHome = this.isGoingHomeLegacy;
+            this.startCleaning = this.startCleaningLegacy;
             this.stopCleaning = this.stopCleaningLegacy;
+            this.setFanSpeed = this.setFanSpeedLegacy;
             this.isSpotCleaning = this.isSpotCleaningLegacy;
             this.updateStatus = this.updateStatusLegacy;
             this.updateInterval = this.updateIntervalLegacy;
@@ -56,14 +64,8 @@ class ValetudoXiaomiVacuum {
         let powerControl = config['power-control'];
 
         if (powerControl) {
-
-            this.log.debug(`PowerControl's default speed is ${powerControl['default-speed']}`);
-
-            const defaultSpeedValue = this.getSpeedValue(powerControl['default-speed'] || (this.legacy_mode ? 'balanced' : 'medium'));
-
-            this.log.debug(`PowerControl's corrected speed is ${defaultSpeedValue}`);
-
-            const highSpeedValue = this.getSpeedValue(powerControl['high-speed'] || (this.legacy_mode ? 'turbo' : 'max'));
+            const defaultSpeedValue = this.getSpeedValue(powerControl['default-speed'] || 'balanced');
+            const highSpeedValue = this.getSpeedValue(powerControl['high-speed'] || 'max');
 
             this.powerControl = {
                 defaultSpeed: defaultSpeedValue,
@@ -81,6 +83,8 @@ class ValetudoXiaomiVacuum {
         this.current_status_time = null;
         this.status_timer = null;
 
+        this.idle_update_interval = 120000;
+        this.busy_update_interval = 10000;
 
         if (!this.ip) {
             throw new Error('You must provide an ip address of the vacuum cleaner.');
@@ -150,7 +154,7 @@ class ValetudoXiaomiVacuum {
     }
 
     statusUrlModern (ip) {
-        return 'http://' + ip + '/api/state';
+        return 'http://' + ip + '/api/v2/robot/state/attributes';
         
     }
 
@@ -167,7 +171,7 @@ class ValetudoXiaomiVacuum {
                     simpleStatus['state'] = value['value'];
                     simpleStatus['cleaning_mode'] = value['flag'];
                     break;
-                case 'FanSpeedStateAttribute':
+                case 'IntensityStateAttribute':
                     simpleStatus['fan_power'] = value['value'];
                     break;
                 case 'BatteryStateAttribute':
@@ -200,7 +204,8 @@ class ValetudoXiaomiVacuum {
             if (error) {
                 callback(error);
             } else {
-                callback(null, this.current_status['fan_power'] === ValetudoXiaomiVacuum.SPEEDS.MIN);
+                this.log.debug(`Fan speed is ${this.current_status['fan_power']}`);
+                callback(null, this.current_status['fan_power'] === ValetudoXiaomiVacuum.SPEEDS.OFF);
             }
         });
     }
@@ -215,18 +220,42 @@ class ValetudoXiaomiVacuum {
         });
     }
 
-
-    setFanSpeed (value, callback) {
-        this.log.debug(`Setting fan power to ${value}`);
-        this.sendJSONRequest('http://' + this.ip + '/api/fanspeed', 'PUT', {speed: value}, true)
-        .then((response) => {
-            callback();
+    async setFanSpeedRequestModern(value) {
+        try {
+            const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/v2/robot/capabilities/FanSpeedControlCapability/preset', method: 'PUT', content: {name: value}, raw_response: true });
             this.updateStatus (true);
-        })
-        .catch((e) => {
+        } catch (e) {
+            this.log.error(`Failed to change fan power: ${e}`);
+            throw(e);
+        }
+
+    }
+
+    async setFanSpeedModern (value, callback) {
+        this.log.debug(`Setting fan power to ${value}`);
+
+        try {
+            const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/v2/robot/capabilities/FanSpeedControlCapability/preset', method: 'PUT', content: {name: value}, raw_response: true });
+            this.updateStatus (true);
+            callback();
+        } catch (e) {
             this.log.error(`Failed to change fan power: ${e}`);
             callback();
-        });
+        }
+    }
+
+    async setFanSpeedLegacy (value, callback) {
+        this.log.debug(`Setting fan power to ${value}`);
+
+        try {
+            const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/fanspeed', method: 'PUT', content: {speed: value}, raw_response: true });
+            callback();
+            this.updateStatus (true);
+            
+        } catch (e) {
+            this.log.error(`Failed to change fan power: ${e}`);
+            callback();
+        }
     }
 
     setHighSpeedMode (on, callback) {
@@ -255,7 +284,7 @@ class ValetudoXiaomiVacuum {
                 callback(null);
                 return;
             } else {
-                this.setFanSpeed(ValetudoXiaomiVacuum.SPEEDS.MIN, callback);
+                this.setFanSpeed(ValetudoXiaomiVacuum.SPEEDS.OFF, callback);
                 return;
             }
         } else {
@@ -317,7 +346,6 @@ class ValetudoXiaomiVacuum {
         });
     }
 
-
     getChargingLegacy (callback) {
         this.getStatus(false, (error) => {
             if (error) {
@@ -354,69 +382,104 @@ class ValetudoXiaomiVacuum {
         return this.services;
     }
 
-    getVersionModern (callback) {
-        this.sendJSONRequest('http://' + this.ip + '/api/v2/valetudo/version')
-            .then((response) => {
-                callback(null, response.version);
-            })
-            .catch((e) => {
-                this.log.error(`Error parsing firmware info: ${e}`);
-                callback(e);
-            });
-    }
-
-    getVersionLegacy (callback) {
-        this.sendJSONRequest('http://' + this.ip + '/api/get_fw_version')
-            .then((response) => {
-                callback(null, response.version);
-            })
-            .catch((e) => {
-                this.log.error(`Error parsing firmware info: ${e}`);
-                callback(e);
-            });
-    }
-
-    doFind (state, callback) {
-        var log = this.log;
-
-        if (state) {
-            log.debug('Executing vacuum find');
-            this.identify(() => {
-                callback(null);
-                setTimeout(() => {
-                    this.findService.updateCharacteristic(Characteristic.On, false);
-                }, 250);
-            });
-        } else {
-            callback(null);
+    async getVersionModern (callback) {
+        try {
+            const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/v2/valetudo/version'});
+            callback(null, response.release);
+        } catch (e) {
+            this.log.error(`Error parsing firmware info: ${e}`);
+            callback(e);
         }
     }
 
-    identify (callback) {
-        var log = this.log;
-        
-        this.sendJSONRequest('http://' + this.ip + '/api/find_robot', 'PUT', null, true)
-            .then((response) => { callback(); })
-            .catch((e) => {
-                log.error(`Failed to identify robot: ${e}`);
-                callback();
-            });
+    async getVersionLegacy (callback) {
+        try {
+            const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/get_fw_version'});
+            callback(null, response.version);
+        } catch (e) {
+            this.log.error(`Error parsing firmware info: ${e}`);
+            callback(e);
+        }
     }
 
-    goHome (state, callback) {
+    async doFindModern (state, callback) {
+        var log = this.log;
+        
+        if (state) {
+        try {
+            const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/v2/robot/capabilities/LocateCapability', method: 'PUT', content: {action: 'locate'}, raw_response: true});
+            callback();
+
+            setTimeout(() => {
+                this.findService.updateCharacteristic(Characteristic.On, false);
+            }, 250);
+        } catch (e) {
+            log.error(`Failed to identify robot: ${e}`);
+            callback(e);
+        }
+    } else {
+        callback(null);
+    }
+    }
+
+    async doFindLegacy (state, callback) {
+        var log = this.log;
+        
+        if (state) {
+        try {
+            const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/find_robot', method: 'PUT', content: {action: 'locate'}, raw_response: true});
+            callback();
+
+            setTimeout(() => {
+                this.findService.updateCharacteristic(Characteristic.On, false);
+            }, 250);
+        } catch (e) {
+            log.error(`Failed to identify robot: ${e}`);
+            callback(e);
+        }
+    } else {
+        callback(null);
+    }
+    }
+
+    identify (callback) {
+        doFind(true, callback);
+    }
+
+    async goHomeModern (state, callback) {
         var log = this.log;
 
         if (state) {
             log.debug('Executing go home');
 
-            this.sendJSONRequest('http://' + this.ip + '/api/drive_home', 'PUT', null, true)
-                .then((response) => {
-                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
-                })
-                .catch((e) => {
-                    log.error(`Failed to execute go home: ${e}`);
-                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
-                });
+            try {
+                const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/v2/robot/capabilities/BasicControlCapability', method: 'PUT', content: { action: 'home' }, raw_response: true});
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+
+            } catch (e) {
+                log.error(`Failed to execute go home: ${e}`);
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+            }
+
+        } else {
+            setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+        }
+    }
+
+    async goHomeLegacy (state, callback) {
+        var log = this.log;
+
+        if (state) {
+            log.debug('Executing go home');
+
+            try {
+                const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/drive_home', method: 'PUT', raw_response: true});
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+            } catch (e) {
+                log.error(`Failed to execute go home: ${e}`);
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+            }
+
         } else {
             setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
         }
@@ -452,20 +515,20 @@ class ValetudoXiaomiVacuum {
         });
     }
 
-    startCleaning (state, callback) {
+    async startCleaningModern (state, callback) {
         var log = this.log;
 
         if (state) {
             log.debug('Executing cleaning');
 
-            this.sendJSONRequest('http://' + this.ip + '/api/start_cleaning', 'PUT', null, true)
-                .then((response) => {
-                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
-                })
-                .catch((e) => {
-                    log.error(`Failed to execute start cleaning: ${e}`);
-                    setTimeout(() => { callback(e); this.updateStatus(true); }, 3000);
-                });
+            try {
+                const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/v2/robot/capabilities/BasicControlCapability', method: 'PUT', content: { action: 'start' }, raw_response: true});
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+            } catch (e) {
+                log.error(`Failed to start cleaning: ${e}`);
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+            }
+
         } else {
             this.getStatus(true, (err) => {
                 if (err) {
@@ -484,12 +547,44 @@ class ValetudoXiaomiVacuum {
         }
     }
 
-    stopCleaningModern (callback) {
+    async startCleaningLegacy (state, callback) {
+        var log = this.log;
+
+        if (state) {
+            log.debug('Executing cleaning');
+
+            try {
+                const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/start_cleaning', method: 'PUT', raw_response: true});
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+            } catch (e) {
+                log.error(`Failed to start cleaning: ${e}`);
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+            }
+
+        } else {
+            this.getStatus(true, (err) => {
+                if (err) {
+                    callback(err);
+                    return;
+                }
+
+                if (this.current_status.state === ValetudoXiaomiVacuum.STATES_LEGACY.CLEANING) {
+                    this.stopCleaning(() => {
+                        callback();
+                    });
+                } else {
+                    callback();
+                }
+            });
+        }
+    }
+
+    async stopCleaningModern (callback) {
         var log = this.log;
 
         log.debug('Executing stop cleaning');
 
-        this.getStatus(true, (err) => {
+        this.getStatus(true, async (err) => {
             if (err) {
                 callback(err);
                 return;
@@ -504,23 +599,22 @@ class ValetudoXiaomiVacuum {
                     callback(new Error('Cannot stop cleaning in current state'));
             }
 
-            this.sendJSONRequest('http://' + this.ip + '/api/stop_cleaning', 'PUT', null, true)
-                .then((response) => {
-                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
-                })
-                .catch((e) => {
-                    this.log.error(`Failed to execute spot clean: ${e}`);
-                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
-                });
+            try {
+                const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/v2/robot/capabilities/BasicControlCapability', method: 'PUT', content: {action: 'stop'}, raw_response: true});
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+            } catch (e) {
+                this.log.error(`Failed to stop cleaning: ${e}`);
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+            }
         });
     }
 
-    stopCleaningLegacy (callback) {
+    async stopCleaningLegacy (callback) {
         var log = this.log;
 
         log.debug('Executing stop cleaning');
 
-        this.getStatus(true, (err) => {
+        this.getStatus(true, async (err) => {
             if (err) {
                 callback(err);
                 return;
@@ -536,14 +630,13 @@ class ValetudoXiaomiVacuum {
                     callback(new Error('Cannot stop cleaning in current state'));
             }
 
-            this.sendJSONRequest('http://' + this.ip + '/api/stop_cleaning', 'PUT')
-                .then((response) => {
-                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
-                })
-                .catch((e) => {
-                    this.log.error(`Failed to execute spot clean: ${e}`);
-                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
-                });
+            try {
+                const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/stop_cleaning', method: 'PUT', raw_response: true});
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+            } catch (e) {
+                this.log.error(`Failed to stop cleaning: ${e}`);
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+            }
         });
     }
 
@@ -573,20 +666,19 @@ class ValetudoXiaomiVacuum {
         });
     }
 
-    startSpotCleaning (state, callback) {
+    async startSpotCleaning (state, callback) {
         var log = this.log;
 
         if (state) {
             log.debug('Executing spot cleaning');
 
-            this.sendJSONRequest('http://' + this.ip + '/api/spot_clean', 'PUT', null, true)
-                .then((response) => {
-                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
-                })
-                .catch((e) => {
-                    log.error(`Failed to execute start spot cleaning: ${e}`);
-                    setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
-                });
+            try {
+                const response = await this.sendJSONRequest({url: 'http://' + this.ip + '/api/spot_clean', method: 'PUT', raw_response: true});
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+            } catch (e) {
+                this.log.error(`Failed to start spot cleaning: ${e}`);
+                setTimeout(() => { callback(); this.updateStatus(true); }, 3000);
+            }
         } else {
             callback(new Error('Cannot stop spot cleaning'));
         }
@@ -643,14 +735,14 @@ class ValetudoXiaomiVacuum {
                 this.highSpeedMode = this.current_status['fan_power'] === this.powerControl.highSpeed;
                 this.highSpeedService.updateCharacteristic(Characteristic.On, this.highSpeedMode);
                 if (this.powerControl.mop) {
-                    this.mopMode = this.current_status['fan_power'] === ValetudoXiaomiVacuum.SPEEDS.MIN;
+                    this.mopMode = this.current_status['fan_power'] === ValetudoXiaomiVacuum.SPEEDS.OFF;
                     this.mopService.updateCharacteristic(Characteristic.On, this.mopMode);
                 }
             }
         });
     }
 
-    updateStatusLegacy(forced = false) {
+    updateStatusLegacy (forced = false) {
         this.log.debug('Updating vacuum status');
         this.getStatus(forced, (err) => {
             if (err) {
@@ -683,43 +775,43 @@ class ValetudoXiaomiVacuum {
         });
     }
 
-    updateIntervalModern() {
+    updateIntervalModern () {
         if (this.current_status !== null) {
             switch (this.current_status.state) {
                 case ValetudoXiaomiVacuum.STATES.DOCKED:
                 case ValetudoXiaomiVacuum.STATES.IDLE:
-                    return 120000; // slow update interval for idle states
+                    return this.idle_update_interval; // slow update interval for idle states
                 default:
-                    return 10000; // fast update interval for non-idle states
+                    break;
             }
-        } else {
-            return 10000;
         }
+        
+        return this.busy_update_interval; // fast update interval for non-idle states
     }
 
-    updateIntervalLegacy() {
+    updateIntervalLegacy () {
         if (this.current_status !== null) {
             switch (this.current_status.state) {
                 case ValetudoXiaomiVacuum.STATES_LEGACY.CHARGING:
                 case ValetudoXiaomiVacuum.STATES_LEGACY.IDLE:
-                    return 120000; // slow update interval for idle states
+                    return this.idle_update_interval; // slow update interval for idle states
                 default:
-                    return 10000; // fast update interval for non-idle states
+                    break;
             }
-        } else {
-            return 10000;
         }
+
+        return this.busy_update_interval; // fast update interval for non-idle states
     }
 
-    clearUpdateTimer() {
+    clearUpdateTimer () {
         clearTimeout(this.status_timer);
     }
 
-    setupUpdateTimer() {
+    setupUpdateTimer () {
         this.status_timer = setTimeout(() => { this.updateStatus(true); }, this.updateInterval());
     }
 
-    getStatus(forced, callback) {
+    async getStatus (forced, callback) {
         if (this.status_callbacks.length > 0) {
             this.log.debug('Pushing status callback to queue - updating');
             this.status_callbacks.push(callback);
@@ -730,7 +822,7 @@ class ValetudoXiaomiVacuum {
 
         if (!forced && this.current_status !== null && 
             this.current_status_time !== null && 
-            (now - this.current_status_time < this.updateInterval())) {
+            (now - this.current_status_time < this.busy_update_interval)) {
                 this.log.debug('Returning cached status');
                 callback(null);
                 return;
@@ -741,53 +833,62 @@ class ValetudoXiaomiVacuum {
         this.log.debug(`Executing update, forced: ${forced}`);
         this.status_callbacks.push(callback);
 
-        this.sendJSONRequest(this.statusUrl(this.ip))
-            .then((response) => {
-                this.log.debug('Done executing update');
+        try {
+            const response = await this.sendJSONRequest({url: this.statusUrl(this.ip)});
+            this.log.debug('Done executing update');
 
-                const status = this.parseStatus(response);
+            const status = this.parseStatus(response);
 
-                this.current_status = status;
-                this.current_status_time = Date.now();
-                const callbacks = this.status_callbacks;
-                this.status_callbacks = new Array();
-        
-                this.log.debug(`Calling ${callbacks.length} queued callbacks`);
-                callbacks.forEach((element) => {
-                    element(null, response);
-                });
-                this.setupUpdateTimer();
-        
-            })
-            .catch((e) => {
-                this.log.error(`Error parsing current status info: ${e}`);
-                const callbacks = this.status_callbacks;
-                this.status_callbacks = new Array();
-
-                callbacks.forEach((element) => {
-                    element(e);
-                });
-
-                this.setupUpdateTimer();
+            this.current_status = status;
+            this.current_status_time = Date.now();
+            const callbacks = this.status_callbacks;
+            this.status_callbacks = new Array();
+    
+            this.log.debug(`Calling ${callbacks.length} queued callbacks`);
+            callbacks.forEach((element) => {
+                element(null, response);
             });
+            this.setupUpdateTimer();
+
+        } catch (e) {
+            this.log.error(`Error parsing current status info: ${e}`);
+            const callbacks = this.status_callbacks;
+            this.status_callbacks = new Array();
+
+            callbacks.forEach((element) => {
+                element(e);
+            });
+
+            this.setupUpdateTimer();
+        }
     }
 
     
 
-    sendJSONRequest (url, method = 'GET', payload = null, plainResponse = false) {
+    async sendJSONRequest(params) {
         return new Promise((resolve, reject) => {
 
-            const components = new urllib.URL(url);
+            if (!params.url) {
+                reject(Error('Request URL missing'));
+            }
+
+            const components = new urllib.URL(params.url);
 
             const options = {
-                method: method,
+                method: params.method || 'GET',
+                raw_response: components.raw_response || false,
                 host: components.hostname,
                 port: components.port,
-                path: components.pathname,
+                path: components.pathname + (components.search ? components.search : ''),
                 protocol: components.protocol,
-                headers: {'Content-Type': 'application/json'}
+                headers: { 'Content-Type': 'application/json' }
             };
-    
+
+            if (params.authentication) {
+                let credentials = Buffer.from(params.authentication).toString('base64');
+                options.headers['Authorization'] = 'Basic ' + credentials;
+            }
+
             const req = http.request(options, (res) => {
                 res.setEncoding('utf8');
 
@@ -797,13 +898,13 @@ class ValetudoXiaomiVacuum {
                     try {
                         this.log.debug(`Raw response: ${chunks}`);
 
-                        if (plainResponse) {
+                        if (options.raw_response) {
                             resolve(chunks);
-                            return;
+                        } else {
+                            const parsed = JSON.parse(chunks);
+                            resolve(parsed);
                         }
-                        const parsed = JSON.parse(chunks);
-                        resolve(parsed);
-                    } catch(e) {
+                    } catch (e) {
                         reject(e);
                     }
                 });
@@ -812,8 +913,8 @@ class ValetudoXiaomiVacuum {
                 reject(err);
             });
 
-            if (payload) {
-                const stringified = JSON.stringify(payload);
+            if (params.payload) {
+                const stringified = JSON.stringify(params.payload);
                 this.log(`sending payload: ${stringified}`);
                 req.write(stringified);
             }
@@ -822,22 +923,22 @@ class ValetudoXiaomiVacuum {
         });
     }
 
-    getSpeedValueModern(preset) {
+    getSpeedValueModern (preset) {
         this.log.debug(`speed for ${preset}`);
         switch (preset) {
-            case 'min': return ValetudoXiaomiVacuum.SPEEDS.MIN;
-            case 'quiet': return ValetudoXiaomiVacuum.SPEEDS.MIN;
+            case 'min': return ValetudoXiaomiVacuum.SPEEDS.LOW;
+            case 'quiet': return ValetudoXiaomiVacuum.SPEEDS.LOW;
             case 'low': return ValetudoXiaomiVacuum.SPEEDS.LOW;
             case 'medium': return ValetudoXiaomiVacuum.SPEEDS.MEDIUM;
             case 'balanced': return ValetudoXiaomiVacuum.SPEEDS.MEDIUM;
-            case 'max': return ValetudoXiaomiVacuum.SPEEDS.MAX;
+            case 'max': return ValetudoXiaomiVacuum.SPEEDS.HIGH;
             case 'turbo': return ValetudoXiaomiVacuum.SPEEDS.MAX;
-            case 'mop': return ValetudoXiaomiVacuum.SPEEDS.MIN;
+            case 'mop': return ValetudoXiaomiVacuum.SPEEDS.OFF;
             default: throw Error(`Invalid power preset given: ${preset}`);
         }
     }
 
-    getSpeedValueLegacy(preset) {
+    getSpeedValueLegacy (preset) {
         switch (preset) {
             case 'quiet': return ValetudoXiaomiVacuum.SPEEDS_LEGACY.quiet;
             case 'balanced': return ValetudoXiaomiVacuum.SPEEDS_LEGACY.balanced;
@@ -850,14 +951,14 @@ class ValetudoXiaomiVacuum {
 }
 
 ValetudoXiaomiVacuum.STATES = {
-    ERROR: "error",
-    DOCKED: "docked",
-    IDLE: "idle",
-    RETURNING: "returning",
-    CLEANING: "cleaning",
-    PAUSED: "paused",
-    MANUAL_CONTROL: "manual_control",
-    MOVING: "moving"
+    ERROR: 'error',
+    DOCKED: 'docked',
+    IDLE: 'idle',
+    RETURNING: 'returning',
+    CLEANING: 'cleaning',
+    PAUSED: 'paused',
+    MANUAL_CONTROL: 'manual_control',
+    MOVING: 'moving'
 };
 
 
@@ -892,11 +993,11 @@ ValetudoXiaomiVacuum.BATTERY = {
 };
 
 ValetudoXiaomiVacuum.SPEEDS = {
-    OFF: 'off',
-    MIN: 'min',
     LOW: 'low',
     MEDIUM: 'medium',
-    MAX: 'max'
+    HIGH: 'high',
+    MAX: 'max',
+    OFF: 'off',
 };
 
 ValetudoXiaomiVacuum.SPEEDS_LEGACY = {
