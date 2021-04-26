@@ -6,8 +6,6 @@ let Service; let Characteristic;
 
 class ValetudoXiaomiVacuum {
   statusCallback(status) {
-    this.log.debug(`status callback time! ${this.device}`);
-
     this.device.getBatteryLevel((error, level) => {
       if (error) { return; }
 
@@ -328,7 +326,7 @@ class ValetudoXiaomiVacuum {
         this.mopService = new Service.Switch(`Mopping mode ${this.name}`, 'mopspeed');
         this.mopService.getCharacteristic(Characteristic.On)
           .on('set', (value, callback) => { this.setMopMode(value, callback); })
-          .on('get', (callback) => { this.getMopMode.bind(callback); });
+          .on('get', (callback) => { this.getMopMode(callback); });
         this.services.push(this.mopService);
       }
     }

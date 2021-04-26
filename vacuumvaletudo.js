@@ -31,7 +31,7 @@ class VacuumValetudo {
     this.status_callback = statusCallback;
 
     if (!this.ip) {
-      throw Error('You must provide an ip address of the vacuum cleaner.');
+      throw new Error('You must provide an ip address of the vacuum cleaner.');
     }
   }
 
@@ -68,9 +68,10 @@ class VacuumValetudo {
     this.getStatus(false, (error, status) => {
       if (error) {
         callback(error, false);
-      } else {
-        callback(null, status.fan_power === this.powerControl.highSpeed);
+        return;
       }
+
+      callback(null, status.fan_power === this.powerControl.highSpeed);
     });
   }
 
@@ -78,9 +79,10 @@ class VacuumValetudo {
     this.getStatus(false, (error, status) => {
       if (error) {
         callback(error, false);
-      } else {
-        callback(null, status.fan_power === VacuumValetudo.SPEEDS.OFF);
+        return;
       }
+
+      callback(null, status.fan_power === VacuumValetudo.SPEEDS.OFF);
     });
   }
 
@@ -88,6 +90,7 @@ class VacuumValetudo {
     this.isHighSpeedMode((error, isOn) => {
       if (error) {
         callback(error);
+        return;
       }
 
       if (on && isOn) {
@@ -96,6 +99,7 @@ class VacuumValetudo {
       }
       if (!on && isOn) {
         callback(null);
+        return;
       }
 
       if (on) {
@@ -110,14 +114,17 @@ class VacuumValetudo {
     this.isMopMode((error, isOn) => {
       if (error) {
         callback(error);
+        return;
       }
 
       if (on && isOn) {
         callback(null);
+        return;
       }
 
       if (!on && !isOn) {
         callback(null);
+        return;
       }
 
       if (on) {
@@ -147,9 +154,10 @@ class VacuumValetudo {
     this.getStatus(false, (error, status) => {
       if (error) {
         callback(error, null);
-      } else {
-        callback(null, status.battery);
+        return;
       }
+
+      callback(null, status.battery);
     });
   }
 
@@ -182,32 +190,30 @@ class VacuumValetudo {
   }
 
   async doFind(callback) {
-    const { log } = this;
-
     try {
       await sendJSONRequest({
         url: `http://${this.ip}/api/v2/robot/capabilities/LocateCapability`, method: 'PUT', content: { action: 'locate' }, raw_response: true,
       });
       callback();
     } catch (e) {
-      log.error(`Failed to identify robot: ${e}`);
+      this.log.error(`Failed to identify robot: ${e}`);
       callback(e);
     }
   }
 
   async goHome(callback) {
-    const { log } = this;
-
-    log.debug('Executing go home');
+    this.log.debug('Executing go home');
 
     try {
       await sendJSONRequest({
         url: `http://${this.ip}/api/v2/robot/capabilities/BasicControlCapability`, method: 'PUT', content: { action: 'home' }, raw_response: true,
       });
+      callback();
     } catch (e) {
-      log.error(`Failed to execute go home: ${e}`);
+      this.log.error(`Failed to execute go home: ${e}`);
+      callback(e);
     } finally {
-      setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+      setTimeout(() => { this.updateStatus(true); }, 2000);
     }
   }
 
@@ -229,10 +235,12 @@ class VacuumValetudo {
       await sendJSONRequest({
         url: `http://${this.ip}/api/v2/robot/capabilities/BasicControlCapability`, method: 'PUT', content: { action: 'start' }, raw_response: true,
       });
-      setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+      callback();
     } catch (e) {
       this.log.error(`Failed to start cleaning: ${e}`);
-      setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+      callback(e);
+    } finally {
+      setTimeout(() => { this.updateStatus(true); }, 2000);
     }
   }
 
@@ -258,10 +266,12 @@ class VacuumValetudo {
         await sendJSONRequest({
           url: `http://${this.ip}/api/v2/robot/capabilities/BasicControlCapability`, method: 'PUT', content: { action: 'stop' }, raw_response: true,
         });
-        setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+        callback();
       } catch (e) {
         this.log.error(`Failed to stop cleaning: ${e}`);
-        setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+        callback(e);
+      } finally {
+        setTimeout(() => { this.updateStatus(true); }, 2000);
       }
     });
   }
@@ -283,10 +293,12 @@ class VacuumValetudo {
     this.log.debug('Executing spot cleaning');
     try {
       await sendJSONRequest({ url: `http://${this.ip}/api/spot_clean`, method: 'PUT', raw_response: true });
-      setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+      callback();
     } catch (e) {
       this.log.error(`Failed to start spot cleaning: ${e}`);
-      setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+      callback(e);
+    } finally {
+      setTimeout(() => { this.updateStatus(true); }, 2000);
     }
   }
 

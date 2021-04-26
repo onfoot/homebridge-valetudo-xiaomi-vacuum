@@ -2,7 +2,7 @@ const { sendJSONRequest } = require('./request');
 const types = require('./types');
 
 class VacuumRe {
-  constructor(log, config) {
+  constructor(log, config, statusCallback) {
     const powerControl = config['power-control'];
 
     if (powerControl) {
@@ -47,9 +47,10 @@ class VacuumRe {
     this.getStatus(false, (error, status) => {
       if (error) {
         callback(error, false);
-      } else {
-        callback(null, status.fan_power === this.powerControl.highSpeed);
+        return;
       }
+
+      callback(null, status.fan_power === this.powerControl.highSpeed);
     });
   }
 
@@ -57,9 +58,10 @@ class VacuumRe {
     this.getStatus(false, (error, status) => {
       if (error) {
         callback(error, false);
-      } else {
-        callback(null, status.fan_power === VacuumRe.SPEEDS.mop);
+        return;
       }
+
+      callback(null, status.fan_power === VacuumRe.SPEEDS.mop);
     });
   }
 
@@ -67,6 +69,7 @@ class VacuumRe {
     this.isHighSpeedMode((error, isOn) => {
       if (error) {
         callback(error);
+        return;
       }
 
       if (on && isOn) {
@@ -75,6 +78,7 @@ class VacuumRe {
       }
       if (!on && isOn) {
         callback(null);
+        return;
       }
 
       if (on) {
@@ -197,10 +201,12 @@ class VacuumRe {
 
     try {
       await sendJSONRequest({ url: `http://${this.ip}/api/drive_home`, method: 'PUT', raw_response: true });
+      callback();
     } catch (e) {
       log.error(`Failed to execute go home: ${e}`);
+      callback(e);
     } finally {
-      setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+      setTimeout(() => { this.updateStatus(true); }, 2000);
     }
   }
 
@@ -220,10 +226,12 @@ class VacuumRe {
 
     try {
       await sendJSONRequest({ url: `http://${this.ip}/api/start_cleaning`, method: 'PUT', raw_response: true });
-      setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+      callback();
     } catch (e) {
       this.log.error(`Failed to start cleaning: ${e}`);
-      setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+      callback(e);
+    } finally {
+      setTimeout(() => { this.updateStatus(true); }, 2000);
     }
   }
 
@@ -250,10 +258,12 @@ class VacuumRe {
 
       try {
         await sendJSONRequest({ url: `http://${this.ip}/api/stop_cleaning`, method: 'PUT', raw_response: true });
-        setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+        callback();
       } catch (e) {
         this.log.error(`Failed to stop cleaning: ${e}`);
-        setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+        callback(e);
+      } finally {
+        setTimeout(() => { this.updateStatus(true); }, 2000);
       }
     });
   }
@@ -274,9 +284,11 @@ class VacuumRe {
     this.log.debug('Executing spot cleaning');
     try {
       await sendJSONRequest({ url: `http://${this.ip}/api/spot_clean`, method: 'PUT', raw_response: true });
-      setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+      callback();
     } catch (e) {
       this.log.error(`Failed to start spot cleaning: ${e}`);
+      callback(e);
+    } finally {
       setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
     }
   }
