@@ -5,6 +5,9 @@ class VacuumValetudo {
   constructor(log, config, statusCallback) {
     const powerControl = config['power-control'];
 
+    this.ip = config.ip;
+    this.log = log;
+
     if (powerControl) {
       const defaultSpeedValue = VacuumValetudo.getSpeedValue(powerControl['default-speed'] || 'balanced');
       const highSpeedValue = VacuumValetudo.getSpeedValue(powerControl['high-speed'] || 'max');
@@ -17,9 +20,6 @@ class VacuumValetudo {
 
       this.log.debug(`Setting power control: default speed - ${this.powerControl.defaultSpeed}, high speed - ${this.powerControl.highSpeed}, mop enabled - ${this.powerControl.mop}`);
     }
-
-    this.ip = config.ip;
-    this.log = log;
 
     this.current_status = null;
     this.status_callbacks = [];

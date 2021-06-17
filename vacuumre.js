@@ -3,6 +3,9 @@ const types = require('./types');
 
 class VacuumRe {
   constructor(log, config, statusCallback) {
+    this.ip = config.ip;
+    this.log = log;
+
     const powerControl = config['power-control'];
 
     if (powerControl) {
@@ -15,11 +18,8 @@ class VacuumRe {
         mop: powerControl['mop-enabled'] === true,
       };
 
-      this.log.debug(`Setting power control: default speed - ${this.powerControl.defaultSpeed}, high speed - ${this.powerControl.highSpeed}, mop enabled - ${this.powerControl.mop}`);
+      log.debug(`Setting power control: default speed - ${this.powerControl.defaultSpeed}, high speed - ${this.powerControl.highSpeed}, mop enabled - ${this.powerControl.mop}`);
     }
-
-    this.ip = config.ip;
-    this.log = log;
 
     this.current_status = null;
     this.status_callbacks = [];
