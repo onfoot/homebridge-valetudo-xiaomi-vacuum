@@ -11,7 +11,7 @@ async function sendJSONRequest(params) {
 
     const options = {
       method: params.method || 'GET',
-      raw_response: components.raw_response || false,
+      raw_response: params.raw_response || false,
       host: components.hostname,
       port: components.port,
       path: components.pathname + (components.search ? components.search : ''),
@@ -31,7 +31,9 @@ async function sendJSONRequest(params) {
       res.on('data', (chunk) => { chunks += chunk; });
       res.on('end', () => {
         try {
-          // this.log.debug(`Raw response: ${chunks}`);
+          if (params.log) {
+            params.log.debug(`Raw response: ${chunks}`);
+          }
 
           if (options.raw_response) {
             resolve(chunks);
@@ -48,9 +50,8 @@ async function sendJSONRequest(params) {
       reject(err);
     });
 
-    if (params.payload) {
-      const stringified = JSON.stringify(params.payload);
-      // this.log(`sending payload: ${stringified}`);
+    if (params.content) {
+      const stringified = JSON.stringify(params.content);
       req.write(stringified);
     }
 
