@@ -93,11 +93,7 @@ class VacuumValetudo {
         return;
       }
 
-      if (on && isOn) {
-        callback(null);
-        return;
-      }
-      if (!on && isOn) {
+      if (on == isOn) {
         callback(null);
         return;
       }
@@ -322,7 +318,7 @@ class VacuumValetudo {
       try {
         this.status_callback(status);
       } catch (e) {
-        this.log.error('status callback function errored out');
+        this.log.error(`status callback function errored out ${e}`);
       }
     });
   }

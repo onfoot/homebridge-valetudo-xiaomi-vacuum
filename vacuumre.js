@@ -72,11 +72,7 @@ class VacuumRe {
         return;
       }
 
-      if (on && isOn) {
-        callback(null);
-        return;
-      }
-      if (!on && isOn) {
+      if (on == isOn) {
         callback(null);
         return;
       }

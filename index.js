@@ -52,15 +52,17 @@ class ValetudoXiaomiVacuum {
         state); // spot cleaning
     });
 
-    if (this.powerControl) {
-      this.device.isHighSpeedMode((error, highSpeedMode) => {
-        if (error) {
-          return;
-        }
-        this.highSpeedService.updateCharacteristic(Characteristic.On, highSpeedMode);
-      });
+    if (this.device.powerControl) {
+      if (this.device.powerControl.highSpeed) {
+        this.device.isHighSpeedMode((error, highSpeedMode) => {
+          if (error) {
+            return;
+          }
+          this.highSpeedService.updateCharacteristic(Characteristic.On, highSpeedMode);
+        });
+      }
 
-      if (this.powerControl.mop) {
+      if (this.device.powerControl.mop) {
         this.device.isMopMode((error, mopMode) => {
           if (error) {
             return;
@@ -72,7 +74,7 @@ class ValetudoXiaomiVacuum {
   }
 
   getHighSpeedMode(callback) {
-    this.device.isHighSpeedMode(false, (error, status) => {
+    this.device.isHighSpeedMode((error, status) => {
       if (error) {
         callback(error);
       } else {
@@ -283,6 +285,10 @@ class ValetudoXiaomiVacuum {
 
     const re = config['legacy-mode'] === true;
 
+    this.device = re
+      ? new VacuumRe(this.log, config, (state) => { this.statusCallback(state); })
+      : new VacuumValetudo(this.log, config, (state) => { this.statusCallback(state); });
+
     this.serviceInfo = new Service.AccessoryInformation();
     this.serviceInfo
       .setCharacteristic(Characteristic.Manufacturer, 'Xiaomi')
@@ -315,14 +321,16 @@ class ValetudoXiaomiVacuum {
       .on('get', (callback) => { this.isSpotCleaning(callback); });
     this.services.push(this.spotCleanService);
 
-    if (this.powerControl) {
-      this.highSpeedService = new Service.Switch(`High speed mode ${this.name}`, 'highspeed');
-      this.highSpeedService.getCharacteristic(Characteristic.On)
-        .on('set', (value, callback) => { this.setHighSpeedMode(value, callback); })
-        .on('get', (callback) => { this.getHighSpeedMode(callback); });
-      this.services.push(this.highSpeedService);
+    if (this.device.powerControl) {
+      if (this.device.powerControl.highSpeed) {
+        this.highSpeedService = new Service.Switch(`High speed mode ${this.name}`, 'highspeed');
+        this.highSpeedService.getCharacteristic(Characteristic.On)
+          .on('set', (value, callback) => { this.setHighSpeedMode(value, callback); })
+          .on('get', (callback) => { this.getHighSpeedMode(callback); });
+        this.services.push(this.highSpeedService);
+      }
 
-      if (this.powerControl.mop) {
+      if (this.device.powerControl.mop) {
         this.mopService = new Service.Switch(`Mopping mode ${this.name}`, 'mopspeed');
         this.mopService.getCharacteristic(Characteristic.On)
           .on('set', (value, callback) => { this.setMopMode(value, callback); })
@@ -342,10 +350,6 @@ class ValetudoXiaomiVacuum {
       .getCharacteristic(Characteristic.StatusLowBattery)
       .on('get', (callback) => { this.getBatteryLow(callback); });
     this.services.push(this.batteryService);
-
-    this.device = re
-      ? new VacuumRe(this.log, config, (state) => { this.statusCallback(state); })
-      : new VacuumValetudo(this.log, config, (state) => { this.statusCallback(state); });
 
     this.device.updateStatus(true);
   }
