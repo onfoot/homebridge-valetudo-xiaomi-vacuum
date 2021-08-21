@@ -1,6 +1,16 @@
+# Fork by MrLitchyB
+The original repo is not really updated anymore and everything stopped working completely when updating my Valetudo to 2021.08.0. I knew an old version of the Valetudo Plugin worked... This is based on that working version. I fixed the error messages and old API usage for personal use. 
+
+### New Fatures
+* Changed the functionality a bit to pause instead of stop when tapping the vacuum in Homekit while cleaning
+* Added option to hide all switches except the cleaning/pause one (easier to control with Siri that way)
+
+### Just-on-off
+If you only want to have cleaning/pausing exposed to HomeKit and control special events via the Valetudo webapp instead, simply add `"just-on-off": true` to the config
+
 # homebridge-valetudo-xiaomi-vacuum
 
-`homebridge-valetudo-xiaomi-vacuum` is a [Homebridge](https://github.com/nfarina/homebridge) plugin which you can use to control your Xiaomi Roborock vacuum that has [Valetudo](https://github.com/Hypfer/Valetudo) installed.
+This is a fork of `homebridge-valetudo-xiaomi-vacuum` which is a [Homebridge](https://github.com/nfarina/homebridge) plugin which you can use to control your Xiaomi Roborock vacuum that has [Valetudo](https://github.com/Hypfer/Valetudo) installed.
 
 ## Installation
 
@@ -16,7 +26,8 @@ Example:
 {
     "accessory": "ValetudoXiaomiVacuum",
     "name": "<Accessory name, e.g. Vacuum>",
-    "ip": "<Vacuum's ip address>"
+    "ip": "<Vacuum's ip address>",
+    "just-on-off": <true or false>
 }
 ```
 
@@ -36,21 +47,6 @@ Example:
         "high-speed": "turbo",
         "mop-enabled": true
     }
-}
-```
-
-## Valetudo RE
-
-If running your vacuum using Valetudo RE, `legacy-mode` needs to be set to `true`.
-
-Example:
-
-```
-{
-    "accessory": "ValetudoXiaomiVacuum",
-    "name": "<Accessory name, e.g. Vacuum>",
-    "ip": "<Vacuum's ip address>",
-    "legacy-mode": true
 }
 ```
 
