@@ -1,7 +1,7 @@
 # Fork by MrLitchyB
 The original repo is not really updated anymore and everything stopped working completely when updating my Valetudo to 2021.08.0. I knew an old version of the Valetudo Plugin worked... This is based on that working version. I fixed the error messages and old API usage for personal use. 
 
-### New Fatures
+### New Features
 * Changed the functionality a bit to pause instead of stop when tapping the vacuum in Homekit while cleaning
 * Added option to hide all switches except the cleaning/pause one (easier to control with Siri that way)
 
