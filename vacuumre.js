@@ -285,7 +285,7 @@ class VacuumRe {
       this.log.error(`Failed to start spot cleaning: ${e}`);
       callback(e);
     } finally {
-      setTimeout(() => { callback(); this.updateStatus(true); }, 2000);
+      setTimeout(() => { this.updateStatus(true); }, 2000);
     }
   }
 

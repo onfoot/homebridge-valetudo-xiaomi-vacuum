@@ -199,8 +199,9 @@ class ValetudoXiaomiVacuum {
       log.debug('Executing go home');
 
       try {
-        await this.device.goHome();
-        callback(null);
+        await this.device.goHome((error) => {
+          callback(error);
+        });
       } catch (e) {
         log.error(`Failed to execute go home: ${e}`);
       }
@@ -305,7 +306,9 @@ class ValetudoXiaomiVacuum {
 
     this.goHomeService = new Service.Switch(`Go Home, ${this.name}`, 'home');
     this.goHomeService.getCharacteristic(Characteristic.On)
-      .on('set', (value, callback) => { this.goHome(value, callback); })
+      .on('set', (value, callback) => {
+        this.goHome(value, callback);
+      })
       .on('get', (callback) => { this.isGoingHome(callback); });
     this.services.push(this.goHomeService);
 
