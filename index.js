@@ -282,6 +282,13 @@ class ValetudoXiaomiVacuum {
     this.services = [];
     this.log = log;
     this.name = config.name || 'Vacuum';
+    this.commandFind = config.commandFind || `Find ${this.name}`;
+    this.commandGoHome = config.commandGoHome || `Go Home, ${this.name}`;
+    this.commandClean = config.commandClean || `Clean, ${this.name}`;
+    this.commandSpotClean = config.commandSpotClean || `Spot Clean, ${this.name}`;
+    this.commandHighSpeedMode = config.commandHighSpeedMode || `High speed mode ${this.name}`;
+    this.commandMoppingMode = config.commandMoppingMode || `Mopping mode ${this.name}`;
+    this.commandBattery = config.commandBattery || `${this.name} Battery`;
     this.lowBatteryThreshold = 10;
 
     const re = config['legacy-mode'] === true;
@@ -299,12 +306,12 @@ class ValetudoXiaomiVacuum {
       .on('get', (callback) => { this.getVersion(callback); });
     this.services.push(this.serviceInfo);
 
-    this.findService = new Service.Switch(`Find ${this.name}`, 'identify');
+    this.findService = new Service.Switch(this.commandFind, 'identify');
     this.findService.getCharacteristic(Characteristic.On)
       .on('set', (value, callback) => { this.doFind(value, callback); });
     this.services.push(this.findService);
 
-    this.goHomeService = new Service.Switch(`Go Home, ${this.name}`, 'home');
+    this.goHomeService = new Service.Switch(this.commandGoHome, 'home');
     this.goHomeService.getCharacteristic(Characteristic.On)
       .on('set', (value, callback) => {
         this.goHome(value, callback);
@@ -312,13 +319,13 @@ class ValetudoXiaomiVacuum {
       .on('get', (callback) => { this.isGoingHome(callback); });
     this.services.push(this.goHomeService);
 
-    this.cleanService = new Service.Switch(`Clean, ${this.name}`, 'clean');
+    this.cleanService = new Service.Switch(this.commandClean, 'clean');
     this.cleanService.getCharacteristic(Characteristic.On)
       .on('set', (value, callback) => { this.startCleaning(value, callback); })
       .on('get', (callback) => { this.isCleaning(callback); });
     this.services.push(this.cleanService);
 
-    this.spotCleanService = new Service.Switch(`Spot Clean, ${this.name}`, 'spotclean');
+    this.spotCleanService = new Service.Switch(this.commandSpotClean, 'spotclean');
     this.spotCleanService.getCharacteristic(Characteristic.On)
       .on('set', (value, callback) => { this.startSpotCleaning(value, callback); })
       .on('get', (callback) => { this.isSpotCleaning(callback); });
@@ -326,7 +333,7 @@ class ValetudoXiaomiVacuum {
 
     if (this.device.powerControl) {
       if (this.device.powerControl.highSpeed) {
-        this.highSpeedService = new Service.Switch(`High speed mode ${this.name}`, 'highspeed');
+        this.highSpeedService = new Service.Switch(this.commandHighSpeedMode, 'highspeed');
         this.highSpeedService.getCharacteristic(Characteristic.On)
           .on('set', (value, callback) => { this.setHighSpeedMode(value, callback); })
           .on('get', (callback) => { this.getHighSpeedMode(callback); });
@@ -334,7 +341,7 @@ class ValetudoXiaomiVacuum {
       }
 
       if (this.device.powerControl.mop) {
-        this.mopService = new Service.Switch(`Mopping mode ${this.name}`, 'mopspeed');
+        this.mopService = new Service.Switch(this.commandMoppingMode, 'mopspeed');
         this.mopService.getCharacteristic(Characteristic.On)
           .on('set', (value, callback) => { this.setMopMode(value, callback); })
           .on('get', (callback) => { this.getMopMode(callback); });
@@ -342,7 +349,7 @@ class ValetudoXiaomiVacuum {
       }
     }
 
-    this.batteryService = new Service.BatteryService(`${this.name} Battery`);
+    this.batteryService = new Service.BatteryService(this.commandBattery);
     this.batteryService
       .getCharacteristic(Characteristic.BatteryLevel)
       .on('get', (callback) => { this.getBattery(callback); });
