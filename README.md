@@ -60,4 +60,31 @@ Tested on Roborock S50 with firmware v001748 and Valetudo 0.6.1.
 
 ## Vacuum map in Home app
 
-I played a little with an idea of setting up a HomeKit camera that grabs the generated Vacuum image and streams it as a video. [The idea issue](https://github.com/onfoot/homebridge-valetudo-xiaomi-vacuum/issues/2#issuecomment-572278178) contains more details.
+I played a little with an idea of setting up a HomeKit camera that grabs the generated Vacuum image and streams it as a video.
+
+Here's how to achieve it:
+
+1. An mqtt broker running on a home server. [hmq](https://github.com/fhmq/hmq) in my case.
+2. Vacuum set up to connect to said mqtt broker.
+3. [I can't believe it's valetudo](https://github.com/Hypfer/ICantBelieveItsNotValetudo) running on the camera server, with webserver enabled, running on port 3030.
+4. [homebridge-camera-ffmpeg](https://www.npmjs.com/package/homebridge-camera-ffmpeg) installed on the camera server's homebridge, properly configured.
+5. Camera added to Home.
+
+`homebridge-camera-ffmpeg` config:
+
+```
+{
+      "name": "Vacuum",
+      "videoConfig": {
+        "source": "-loop 1 -i http://localhost:3030/api/map/image",
+        "videoFilter": "pad='ih*16/9:ih:(ow-iw)/2:(oh-ih)/2',scale=1920:1080",
+        "maxFPS": 5
+      }
+}
+```
+
+- `-loop 1` sets up ffmpeg so it's constantly loading the generated png for each frame
+- `pad` filter is set up so it expands the generated png to an 16:9 aspect ratio image so it looks right in Home app, then it's scaled using `scale` down to 1920x1080
+- `maxFPS` set to a reasonable value; at `1` it was having hard time to start live streaming in Home app; at `5` it's instantaneous
+
+Looks cool!
