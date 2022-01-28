@@ -72,7 +72,7 @@ class VacuumRe {
         return;
       }
 
-      if (on == isOn) {
+      if (on === isOn) {
         callback(null);
         return;
       }
@@ -272,7 +272,7 @@ class VacuumRe {
         return callback(error);
       }
 
-      callback(null, status.state === VacuumRe.STATES.CLEANING);
+      return callback(null, status.state === VacuumRe.STATES.CLEANING);
     });
   }
 
