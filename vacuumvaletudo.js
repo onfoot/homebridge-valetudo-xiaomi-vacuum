@@ -7,6 +7,7 @@ class VacuumValetudo {
 
     this.ip = config.ip;
     this.log = log;
+    this.authentication = config.authentication || null;
 
     if (powerControl) {
       const defaultSpeedValue = VacuumValetudo.getSpeedValue(powerControl['default-speed'] || 'balanced');
@@ -136,7 +137,7 @@ class VacuumValetudo {
 
     try {
       await sendJSONRequest({
-        url: `http://${this.ip}/api/v2/robot/capabilities/FanSpeedControlCapability/preset`, method: 'PUT', content: { name: value }, raw_response: true,
+        url: `http://${this.ip}/api/v2/robot/capabilities/FanSpeedControlCapability/preset`, method: 'PUT', content: { name: value }, raw_response: true, authentication: this.authentication,
       });
       this.updateStatus(true);
       callback(null);
@@ -173,7 +174,7 @@ class VacuumValetudo {
 
   async version(callback) {
     try {
-      const response = await sendJSONRequest({ url: `http://${this.ip}/api/v2/valetudo/version` });
+      const response = await sendJSONRequest({ url: `http://${this.ip}/api/v2/valetudo/version`, authentication: this.authentication });
       if (response != null) {
         callback(null, response.release);
       } else {
@@ -188,7 +189,7 @@ class VacuumValetudo {
   async doFind(callback) {
     try {
       await sendJSONRequest({
-        url: `http://${this.ip}/api/v2/robot/capabilities/LocateCapability`, method: 'PUT', content: { action: 'locate' }, raw_response: true,
+        url: `http://${this.ip}/api/v2/robot/capabilities/LocateCapability`, method: 'PUT', content: { action: 'locate' }, raw_response: true, authentication: this.authentication,
       });
       callback();
     } catch (e) {
@@ -202,7 +203,7 @@ class VacuumValetudo {
 
     try {
       await sendJSONRequest({
-        url: `http://${this.ip}/api/v2/robot/capabilities/BasicControlCapability`, method: 'PUT', content: { action: 'home' }, raw_response: true,
+        url: `http://${this.ip}/api/v2/robot/capabilities/BasicControlCapability`, method: 'PUT', content: { action: 'home' }, raw_response: true, authentication: this.authentication,
       });
       callback();
     } catch (e) {
@@ -229,7 +230,7 @@ class VacuumValetudo {
 
     try {
       await sendJSONRequest({
-        url: `http://${this.ip}/api/v2/robot/capabilities/BasicControlCapability`, method: 'PUT', content: { action: 'start' }, raw_response: true,
+        url: `http://${this.ip}/api/v2/robot/capabilities/BasicControlCapability`, method: 'PUT', content: { action: 'start' }, raw_response: true, authentication: this.authentication,
       });
       callback();
     } catch (e) {
@@ -260,7 +261,7 @@ class VacuumValetudo {
 
       try {
         await sendJSONRequest({
-          url: `http://${this.ip}/api/v2/robot/capabilities/BasicControlCapability`, method: 'PUT', content: { action: 'stop' }, raw_response: true,
+          url: `http://${this.ip}/api/v2/robot/capabilities/BasicControlCapability`, method: 'PUT', content: { action: 'stop' }, raw_response: true, authentication: this.authentication,
         });
         callback();
       } catch (e) {
@@ -288,7 +289,7 @@ class VacuumValetudo {
   async startSpotCleaning(callback) {
     this.log.debug('Executing spot cleaning');
     try {
-      await sendJSONRequest({ url: `http://${this.ip}/api/spot_clean`, method: 'PUT', raw_response: true });
+      await sendJSONRequest({ url: `http://${this.ip}/api/spot_clean`, method: 'PUT', raw_response: true, authentication: this.authentication });
       callback();
     } catch (e) {
       this.log.error(`Failed to start spot cleaning: ${e}`);
@@ -367,7 +368,10 @@ class VacuumValetudo {
     this.status_callbacks.push(callback);
 
     try {
-      const response = await sendJSONRequest({ url: VacuumValetudo.statusUrl(this.ip) });
+      const response = await sendJSONRequest({
+        url: VacuumValetudo.statusUrl(this.ip),
+        authentication: this.authentication,
+      });
       this.log.debug('Done executing update');
 
       const status = VacuumValetudo.parseStatus(response);

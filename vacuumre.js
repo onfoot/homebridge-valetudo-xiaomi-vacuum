@@ -5,6 +5,7 @@ class VacuumRe {
   constructor(log, config, statusCallback) {
     this.ip = config.ip;
     this.log = log;
+    this.authentication = config.authentication || null;
 
     const powerControl = config['power-control'];
 
@@ -112,7 +113,7 @@ class VacuumRe {
 
     try {
       await sendJSONRequest({
-        url: `http://${this.ip}/api/fanspeed`, method: 'PUT', content: { speed: value }, raw_response: true,
+        url: `http://${this.ip}/api/fanspeed`, method: 'PUT', content: { speed: value }, raw_response: true, authentication: this.authentication,
       });
       this.updateStatus(true);
       callback(null);
@@ -151,7 +152,7 @@ class VacuumRe {
 
   async version(callback) {
     try {
-      const response = await sendJSONRequest({ url: `http://${this.ip}/api/get_fw_version` });
+      const response = await sendJSONRequest({ url: `http://${this.ip}/api/get_fw_version`, authentication: this.authentication });
       if (response != null) {
         callback(null, response.version);
       } else {
@@ -181,7 +182,7 @@ class VacuumRe {
 
     try {
       await sendJSONRequest({
-        url: `http://${this.ip}/api/find_robot`, method: 'PUT', content: { action: 'locate' }, raw_response: true,
+        url: `http://${this.ip}/api/find_robot`, method: 'PUT', content: { action: 'locate' }, raw_response: true, authentication: this.authentication,
       });
       callback();
     } catch (e) {
@@ -196,7 +197,7 @@ class VacuumRe {
     log.debug('Executing go home');
 
     try {
-      await sendJSONRequest({ url: `http://${this.ip}/api/drive_home`, method: 'PUT', raw_response: true });
+      await sendJSONRequest({ url: `http://${this.ip}/api/drive_home`, method: 'PUT', raw_response: true, authentication: this.authentication });
       callback();
     } catch (e) {
       log.error(`Failed to execute go home: ${e}`);
@@ -221,7 +222,7 @@ class VacuumRe {
     this.log.debug('Executing cleaning');
 
     try {
-      await sendJSONRequest({ url: `http://${this.ip}/api/start_cleaning`, method: 'PUT', raw_response: true });
+      await sendJSONRequest({ url: `http://${this.ip}/api/start_cleaning`, method: 'PUT', raw_response: true, authentication: this.authentication });
       callback();
     } catch (e) {
       this.log.error(`Failed to start cleaning: ${e}`);
@@ -253,7 +254,7 @@ class VacuumRe {
       }
 
       try {
-        await sendJSONRequest({ url: `http://${this.ip}/api/stop_cleaning`, method: 'PUT', raw_response: true });
+        await sendJSONRequest({ url: `http://${this.ip}/api/stop_cleaning`, method: 'PUT', raw_response: true, authentication: this.authentication });
         callback();
       } catch (e) {
         this.log.error(`Failed to stop cleaning: ${e}`);
@@ -279,7 +280,7 @@ class VacuumRe {
   async startSpotCleaning(callback) {
     this.log.debug('Executing spot cleaning');
     try {
-      await sendJSONRequest({ url: `http://${this.ip}/api/spot_clean`, method: 'PUT', raw_response: true });
+      await sendJSONRequest({ url: `http://${this.ip}/api/spot_clean`, method: 'PUT', raw_response: true, authentication: this.authentication });
       callback();
     } catch (e) {
       this.log.error(`Failed to start spot cleaning: ${e}`);
@@ -359,7 +360,10 @@ class VacuumRe {
     this.status_callbacks.push(callback);
 
     try {
-      const response = await sendJSONRequest({ url: VacuumRe.statusUrl(this.ip) });
+      const response = await sendJSONRequest({
+        url: VacuumRe.statusUrl(this.ip),
+        authentication: this.authentication,
+      });
       this.log.debug('Done executing update');
 
       const status = VacuumRe.parseStatus(response);

@@ -54,6 +54,21 @@ Example:
 }
 ```
 
+## Authentication
+
+If your vacuum access is restricted with login and password, you need to add a `authentication` option with the value of `<username>:<password>` to device's config.
+
+Example for when username and password are "admin" (not recommended!):
+
+```
+{
+    "accessory": "ValetudoXiaomiVacuum",
+    "name": "<Accessory name, e.g. Vacuum>",
+    "ip": "<Vacuum's ip address>",
+    "authentication": "admin:admin"
+}
+```
+
 ## Compatibility
 
 Tested on Roborock S50 with firmware v001748 and Valetudo 0.6.1.
