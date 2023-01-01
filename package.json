@@ -1,6 +1,6 @@
 {
   "name": "homebridge-valetudo-xiaomi-vacuum",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A Homebridge plugin for Xiaomi Vacuum Cleaner 1st gen (Mi Robot) and 2nd gen (Roborock S50), with Valetudo installed.",
   "license": "MIT",
   "keywords": [
