@@ -38,8 +38,12 @@ async function sendJSONRequest(params) {
           if (options.raw_response) {
             resolve(chunks);
           } else {
-            const parsed = JSON.parse(chunks);
-            resolve(parsed);
+            try {
+              const parsed = JSON.parse(chunks);
+              resolve(parsed);
+            } catch (parseError) {
+              reject(new Error(`${parseError}; content: '${chunks}'`));
+            }
           }
         } catch (e) {
           reject(e);
